@@ -19,7 +19,7 @@ use starknet_types_core::felt::Felt;
 
 use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
 use super::contract_class::SierraContractClassV1;
-use super::entry_point::CallEntryPoint;
+use super::entry_point::{CallEntryPoint};
 use super::native_syscall_handler::NativeSyscallHandler;
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::state::state_api::State;
@@ -110,8 +110,18 @@ pub fn setup_syscall_handler(
     execution_context: EntryPointExecutionContext,
     events: Vec<OrderedEvent>,
     l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
+    resources: ExecutionResources,
+    inner_calls: Vec<CallInfo>,
 ) -> NativeSyscallHandler<'_> {
-    NativeSyscallHandler { state, storage_address, execution_context, events, l2_to_l1_messages }
+    NativeSyscallHandler {
+        state,
+        storage_address,
+        execution_context,
+        resources,
+        events,
+        l2_to_l1_messages,
+        inner_calls,
+    }
 }
 
 pub fn wrap_syscall_handler(syscall_handler: &mut NativeSyscallHandler<'_>) -> SyscallHandlerMeta {

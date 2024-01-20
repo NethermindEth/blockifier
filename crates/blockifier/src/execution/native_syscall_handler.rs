@@ -1,17 +1,26 @@
+use std::sync::Arc;
+
 use cairo_native::starknet::StarkNetSyscallHandler;
-use starknet_api::core::{ContractAddress, EthAddress, PatriciaKey};
+use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
+use starknet_api::core::{
+    calculate_contract_address, ClassHash, ContractAddress, EthAddress, PatriciaKey,
+};
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
-use starknet_api::transaction::{EventContent, EventData, EventKey, L2ToL1Payload};
+use starknet_api::transaction::{
+    Calldata, ContractAddressSalt, EventContent, EventData, EventKey, L2ToL1Payload,
+};
 use starknet_types_core::felt::Felt;
 
 use super::sierra_utils::{felt_to_starkfelt, starkfelt_to_felt};
 use crate::abi::constants;
-use crate::execution::call_info::{MessageToL1, OrderedEvent, OrderedL2ToL1Message};
+use crate::execution::call_info::{CallInfo, MessageToL1, OrderedEvent, OrderedL2ToL1Message};
 use crate::execution::common_hints::ExecutionMode;
-use crate::execution::entry_point::EntryPointExecutionContext;
+use crate::execution::entry_point::{ConstructorContext, EntryPointExecutionContext};
+use crate::execution::execution_utils::execute_deployment;
 use crate::execution::syscalls::hint_processor::{
-    BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_EXECUTION_MODE_ERROR,
+    BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_CALCULATE_CONTRACT_ADDRESS,
+    INVALID_EXECUTION_MODE_ERROR,
 };
 use crate::state::state_api::State;
 
@@ -19,8 +28,10 @@ pub struct NativeSyscallHandler<'state> {
     pub state: &'state mut dyn State,
     pub storage_address: ContractAddress,
     pub execution_context: EntryPointExecutionContext,
+    pub resources: ExecutionResources,
     pub events: Vec<OrderedEvent>,
     pub l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
+    pub inner_calls: Vec<CallInfo>,
 }
 
 impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
@@ -67,13 +78,64 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
 
     fn deploy(
         &mut self,
-        _class_hash: Felt,
-        _contract_address_salt: Felt,
-        _calldata: &[Felt],
-        _deploy_from_zero: bool,
-        _remaining_gas: &mut u128,
+        class_hash: Felt,
+        contract_address_salt: Felt,
+        calldata: &[Felt],
+        deploy_from_zero: bool,
+        remaining_gas: &mut u128,
     ) -> cairo_native::starknet::SyscallResult<(Felt, Vec<Felt>)> {
-        todo!("Native syscall handler - deploy")
+        let deployer_address =
+            if deploy_from_zero { ContractAddress::default() } else { self.storage_address };
+
+        let class_hash = ClassHash(felt_to_starkfelt(class_hash));
+
+        let wrapper_calldata = Calldata(Arc::new(
+            calldata
+                .to_vec()
+                .iter()
+                .map(|felt| felt_to_starkfelt(*felt))
+                .collect::<Vec<StarkFelt>>(),
+        ));
+
+        let calculated_contract_address = calculate_contract_address(
+            ContractAddressSalt(felt_to_starkfelt(contract_address_salt)),
+            class_hash,
+            &wrapper_calldata,
+            deployer_address,
+        )
+        .map_err(|_| vec![Felt::from_hex(FAILED_TO_CALCULATE_CONTRACT_ADDRESS).unwrap()])?;
+
+        let ctor_context = ConstructorContext {
+            class_hash,
+            code_address: Some(calculated_contract_address),
+            storage_address: calculated_contract_address,
+            caller_address: deployer_address,
+        };
+
+        let call_info = execute_deployment(
+            self.state,
+            // todo: handle this properly
+            &mut Default::default(),
+            &mut self.execution_context,
+            ctor_context,
+            wrapper_calldata,
+            // todo: handle gas properly
+            remaining_gas.clone() as u64,
+        )
+        .map_err(|e| vec![Felt::from_bytes_be_slice(e.to_string().as_bytes())])?;
+
+        self.inner_calls.push(call_info.clone());
+
+        *remaining_gas =
+            remaining_gas.saturating_sub(call_info.execution.gas_consumed.clone() as u128);
+
+        let contract_address_felt =
+            Felt::from_bytes_be_slice(&calculated_contract_address.0.key().bytes());
+
+        Ok((
+            contract_address_felt,
+            call_info.execution.retdata.0[..].iter().map(|felt| starkfelt_to_felt(*felt)).collect(),
+        ))
     }
 
     fn replace_class(
