@@ -32,6 +32,7 @@ use crate::execution::contract_class::ContractClassV0;
 use crate::execution::entry_point::CallEntryPoint;
 use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
+use crate::execution::sierra_utils::starkfelt_to_utf8;
 use crate::execution::syscalls::hint_processor::{
     BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_EXECUTE_CALL, FAILED_TO_GET_CONTRACT_CLASS,
     FORBIDDEN_CLASS_REPLACEMENT, INVALID_EXECUTION_MODE_ERROR, L1_GAS, L2_GAS, OUT_OF_GAS_ERROR,
@@ -39,7 +40,7 @@ use crate::execution::syscalls::hint_processor::{
 };
 use crate::retdata;
 use crate::state::state_api::{State, StateReader};
-use crate::test_utils::cached_state::{create_deploy_test_state, create_test_state};
+use crate::test_utils::cached_state::{create_deploy_test_state, create_oz_erc20_test_state, create_test_state};
 use crate::test_utils::contracts::FeatureContract;
 use crate::test_utils::initial_test_state::test_state;
 use crate::test_utils::{
@@ -82,6 +83,68 @@ fn test_storage_read_write() {
     let value_from_state =
         state.get_storage_at(storage_address, StorageKey::try_from(key).unwrap()).unwrap();
     assert_eq!(value_from_state, value);
+}
+
+#[test]
+fn test_oz_erc20() {
+    let mut state = create_oz_erc20_test_state();
+
+    let calldata = calldata![stark_felt!(1_u8), stark_felt!(0_u8), stark_felt!(0_u8)];
+
+    let entry_point_call = CallEntryPoint {
+        calldata,
+        caller_address: ContractAddress::from(2_u128),
+        entry_point_selector: selector_from_name("transfer"), // works
+        ..trivial_external_entry_point()
+    };
+
+    let result = entry_point_call.execute_directly(&mut state).unwrap();
+
+    // interpret and print the error message if there is one
+    println!("{}", starkfelt_to_utf8(&result.execution.retdata.0[0]));
+
+    assert_eq!(
+        result.execution,
+        CallExecution {
+            retdata: retdata![stark_felt!(1_u8)],
+            gas_consumed: 34650,
+            events: vec![
+                OrderedEvent {
+                    order: 0,
+                    event: EventContent {
+                        keys: vec![
+                            EventKey(
+                                StarkFelt::try_from(
+                                    "0x0099cd8bde557814842a3121e8ddfd433a539b8c9f14bf31ebf108d12e6196e9",
+                                ).unwrap(),
+                            ),
+                            EventKey(
+                                StarkFelt::try_from(
+                                    "0x0000000000000000000000000000000000000000000000000000000000000002",
+                                ).unwrap(),
+                            ),
+                            EventKey(
+                                StarkFelt::try_from(
+                                    "0x0000000000000000000000000000000000000000000000000000000000000001",
+                                ).unwrap(),
+                            ),
+                        ],
+                        data: EventData(
+                            vec![
+                                StarkFelt::try_from(
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                ).unwrap(),
+                                StarkFelt::try_from(
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                ).unwrap(),
+                            ],
+                        ),
+                    },
+                },
+            ],
+            ..CallExecution::default()
+        }
+    )
 }
 
 #[test]

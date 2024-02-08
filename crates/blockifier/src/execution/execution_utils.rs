@@ -56,22 +56,25 @@ pub fn execute_entry_point_call(
     context: &mut EntryPointExecutionContext,
 ) -> EntryPointExecutionResult<CallInfo> {
     match contract_class {
-        ContractClass::V0(contract_class) => {
-            deprecated_entry_point_execution::execute_entry_point_call(
-                call,
-                contract_class,
-                state,
-                resources,
-                context,
-            )
-        }
-        ContractClass::V1(contract_class) => entry_point_execution::execute_entry_point_call(
-            call,
-            contract_class,
-            state,
-            resources,
-            context,
-        ),
+        ContractClass::V0(contract_class) => todo!(),
+        // commented just to make extra super sure the test is running through native
+        // {
+        //     deprecated_entry_point_execution::execute_entry_point_call(
+        //         call,
+        //         contract_class,
+        //         state,
+        //         resources,
+        //         context,
+        //     )
+        // }
+        ContractClass::V1(contract_class) => todo!(),
+        // entry_point_execution::execute_entry_point_call(
+        //     call,
+        //     contract_class,
+        //     state,
+        //     resources,
+        //     context,
+        // ),
         ContractClass::V1Sierra(contract_class) => {
             native_entry_point_execution::execute_entry_point_call(
                 call,

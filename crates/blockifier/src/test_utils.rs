@@ -97,6 +97,11 @@ pub const TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/test_contract.casm.json";
 pub const TEST_CONTRACT_SIERRA_PATH: &str =
     "./feature_contracts/cairo1/compiled/sierra_test_contract.sierra.json";
+pub const TEST_CONTRACT_OZ_ERC20_SIERRA_PATH: &str =
+    // "./feature_contracts/cairo1/compiled/sierra_test_contract.sierra.json";
+    // "../../../oz_cairo_contracts/scratch/my_project/target/dev/my_project.sierra.json";
+    // "/home/dom/dev/nubia/oz_cairo_contracts/scratch/my_project/target/dev/my_project_MyToken.contract_class.json";
+    "./oz_erc20/target/dev/my_project_ERC20.contract_class.json";
 pub const LEGACY_TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/legacy_test_contract.casm.json";
 pub const SECURITY_TEST_CONTRACT_CAIRO0_PATH: &str =

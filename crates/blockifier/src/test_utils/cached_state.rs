@@ -17,6 +17,8 @@ use crate::test_utils::{
     TEST_EMPTY_CONTRACT_CLASS_HASH, TEST_ERC20_FULL_CONTRACT_CLASS_HASH,
 };
 
+use super::TEST_CONTRACT_OZ_ERC20_SIERRA_PATH;
+
 pub fn deprecated_create_test_state() -> CachedState<DictStateReader> {
     let class_hash_to_class = get_class_hash_to_v0_class_mapping();
     let address_to_class_hash = get_address_to_v0_class_hash();
@@ -30,6 +32,31 @@ pub fn deprecated_create_test_state() -> CachedState<DictStateReader> {
 
 pub fn create_test_state() -> CachedState<DictStateReader> {
     let class_hash_to_class = get_class_hash_to_v1_class_mapping();
+
+    let mut address_to_class_hash = common_map_setup();
+    address_to_class_hash.insert(
+        contract_address!(LEGACY_TEST_CONTRACT_ADDRESS),
+        class_hash!(LEGACY_TEST_CLASS_HASH),
+    );
+
+    CachedState::from(DictStateReader {
+        class_hash_to_class,
+        address_to_class_hash,
+        ..Default::default()
+    })
+}
+
+pub fn create_oz_erc20_test_state() -> CachedState<DictStateReader> {
+    let class_hash_to_class = HashMap::from([
+        // (
+        //     class_hash!(TEST_CLASS_HASH),
+        //     ContractClassV1::from_file(TEST_CONTRACT_CAIRO1_PATH).into(),
+        // ),
+        (
+            class_hash!(TEST_CLASS_HASH),
+            SierraContractClassV1::from_file(TEST_CONTRACT_OZ_ERC20_SIERRA_PATH).into(),
+        ),
+    ]);
 
     let mut address_to_class_hash = common_map_setup();
     address_to_class_hash.insert(

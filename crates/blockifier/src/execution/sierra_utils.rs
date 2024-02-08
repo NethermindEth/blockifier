@@ -158,6 +158,10 @@ fn starkfelts_to_felts(data: &[StarkFelt]) -> Vec<Felt> {
     data.iter().map(|starkfelt| starkfelt_to_felt(*starkfelt)).collect_vec()
 }
 
+pub fn starkfelt_to_utf8(felt: &StarkFelt) -> String {
+    String::from_utf8(felt.bytes().into()).unwrap()
+}
+
 pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
