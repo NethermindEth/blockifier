@@ -99,6 +99,59 @@ impl AccountTransactionContext {
             AccountTransactionContext::Deprecated(context) => Ok(context.max_fee),
         }
     }
+
+    pub fn tip(&self) -> Tip {
+        match self {
+            AccountTransactionContext::Current(context) => context.tip,
+            AccountTransactionContext::Deprecated(_) => Tip(0),
+        }
+    }
+
+    pub fn nonce_data_availability_mode(&self) -> DataAvailabilityMode {
+        match self {
+            AccountTransactionContext::Current(context) => context.nonce_data_availability_mode,
+            AccountTransactionContext::Deprecated(_) => DataAvailabilityMode::L1,
+        }
+    }
+
+    pub fn fee_data_availability_mode(&self) -> DataAvailabilityMode {
+        match self {
+            AccountTransactionContext::Current(context) => context.fee_data_availability_mode,
+            AccountTransactionContext::Deprecated(_) => DataAvailabilityMode::L1,
+        }
+    }
+
+    pub fn paymaster_data(&self) -> PaymasterData {
+        match self {
+            AccountTransactionContext::Current(context) => context.paymaster_data.clone(),
+            AccountTransactionContext::Deprecated(_) => Default::default(),
+        }
+    }
+
+    pub fn account_deployment_data(&self) -> AccountDeploymentData {
+        match self {
+            AccountTransactionContext::Current(context) => context.account_deployment_data.clone(),
+            AccountTransactionContext::Deprecated(_) => Default::default(),
+        }
+    }
+
+    pub fn l1_resource_bounds(&self) -> TransactionFeeResult<ResourceBounds> {
+        match self {
+            AccountTransactionContext::Current(context) => context.l1_resource_bounds(),
+            AccountTransactionContext::Deprecated(_) => {
+                Err(TransactionFeeError::MissingL1GasBounds)
+            }
+        }
+    }
+
+    pub fn l2_resource_bounds(&self) -> TransactionFeeResult<ResourceBounds> {
+        match self {
+            AccountTransactionContext::Current(context) => context.l2_resource_bounds(),
+            AccountTransactionContext::Deprecated(_) => {
+                Err(TransactionFeeError::MissingL2GasBounds)
+            }
+        }
+    }
 }
 
 impl HasRelatedFeeType for AccountTransactionContext {
@@ -142,6 +195,14 @@ impl CurrentAccountTransactionContext {
         match self.resource_bounds.0.get(&Resource::L1Gas).copied() {
             Some(bounds) => Ok(bounds),
             None => Err(TransactionFeeError::MissingL1GasBounds),
+        }
+    }
+
+    /// Fetch the L2 resource bounds, if they exist.
+    pub fn l2_resource_bounds(&self) -> TransactionFeeResult<ResourceBounds> {
+        match self.resource_bounds.0.get(&Resource::L2Gas).copied() {
+            Some(bounds) => Ok(bounds),
+            None => Err(TransactionFeeError::MissingL2GasBounds),
         }
     }
 }

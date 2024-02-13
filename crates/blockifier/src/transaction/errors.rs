@@ -45,6 +45,8 @@ pub enum TransactionFeeError {
     MaxL1GasAmountTooLow { max_l1_gas_amount: u64, minimal_l1_gas_amount: u64 },
     #[error("Missing L1 gas bounds in resource bounds.")]
     MissingL1GasBounds,
+    #[error("Missing L2 gas bounds in resource bounds.")]
+    MissingL2GasBounds,
     #[error(transparent)]
     StateError(#[from] StateError),
 }

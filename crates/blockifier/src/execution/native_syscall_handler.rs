@@ -15,7 +15,9 @@ use starknet_api::transaction::{
 };
 use starknet_types_core::felt::Felt;
 
-use super::sierra_utils::{chain_id_to_felt, contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt};
+use super::sierra_utils::{
+    chain_id_to_felt, contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt,
+};
 use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, MessageToL1, OrderedEvent, OrderedL2ToL1Message};
 use crate::execution::common_hints::ExecutionMode;
@@ -28,7 +30,7 @@ use crate::execution::syscalls::hint_processor::{
     execute_inner_call_raw, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_CALCULATE_CONTRACT_ADDRESS,
     FAILED_TO_EXECUTE_CALL, FAILED_TO_GET_CONTRACT_CLASS, FAILED_TO_PARSE, FAILED_TO_READ_RESULT,
     FAILED_TO_SET_CLASS_HASH, FAILED_TO_WRITE, FORBIDDEN_CLASS_REPLACEMENT, INVALID_ARGUMENT,
-    INVALID_EXECUTION_MODE_ERROR, INVALID_INPUT_LENGTH_ERROR,
+    INVALID_EXECUTION_MODE_ERROR, INVALID_INPUT_LENGTH_ERROR, L1_GAS, L2_GAS,
 };
 use crate::state::state_api::State;
 
@@ -93,11 +95,12 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             sequencer_address: contract_address_to_felt(block_context.sequencer_address),
         };
 
-        let signature = account_tx_context.signature().0.into_iter().map(starkfelt_to_felt).collect();
+        let signature =
+            account_tx_context.signature().0.into_iter().map(starkfelt_to_felt).collect();
 
         let tx_info = TxInfo {
             version: starkfelt_to_felt(account_tx_context.version().0),
-            account_contract_address: contract_address_to_felt(account_tx_context.sender_address(),),
+            account_contract_address: contract_address_to_felt(account_tx_context.sender_address()),
             // todo(rodro): it is ok to unwrap as default? Also, will this be deprecated soon?
             max_fee: account_tx_context.max_fee().unwrap_or_default().0,
             signature,
@@ -126,6 +129,24 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         let block_context = &self.execution_context.block_context;
         let account_tx_context = &self.execution_context.account_tx_context;
 
+        let mut resource_bounds: Vec<cairo_native::starknet::ResourceBounds> = vec![];
+
+        if let Ok(bounds) = account_tx_context.l1_resource_bounds() {
+            resource_bounds.push(cairo_native::starknet::ResourceBounds {
+                resource: Felt::from_hex(L1_GAS).unwrap(),
+                max_amount: bounds.max_amount,
+                max_price_per_unit: bounds.max_price_per_unit,
+            });
+        }
+
+        if let Ok(bounds) = account_tx_context.l2_resource_bounds() {
+            resource_bounds.push(cairo_native::starknet::ResourceBounds {
+                resource: Felt::from_hex(L2_GAS).unwrap(),
+                max_amount: bounds.max_amount,
+                max_price_per_unit: bounds.max_price_per_unit,
+            });
+        }
+
         Ok(ExecutionInfoV2 {
             block_info: BlockInfo {
                 block_number: block_context.block_number.0,
@@ -134,18 +155,38 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             },
             tx_info: TxV2Info {
                 version: starkfelt_to_felt(account_tx_context.version().0),
-                account_contract_address: contract_address_to_felt(account_tx_context.sender_address()),
+                account_contract_address: contract_address_to_felt(
+                    account_tx_context.sender_address(),
+                ),
                 max_fee: account_tx_context.max_fee().unwrap_or_default().0,
-                signature: vec![],
-                transaction_hash: Default::default(),
-                chain_id: Default::default(),
-                nonce: Default::default(),
-                resource_bounds: vec![],
-                tip: 0,
-                paymaster_data: vec![],
-                nonce_data_availability_mode: 0,
-                fee_data_availability_mode: 0,
-                account_deployment_data: vec![],
+                signature: account_tx_context
+                    .signature()
+                    .0
+                    .iter()
+                    .map(|e| starkfelt_to_felt(*e))
+                    .collect(),
+                transaction_hash: Felt::from_bytes_be_slice(
+                    account_tx_context.transaction_hash().0.bytes(),
+                ),
+                chain_id: Felt::from_bytes_be_slice(block_context.chain_id.0.as_bytes()),
+                nonce: starkfelt_to_felt(account_tx_context.nonce().0),
+                resource_bounds,
+                tip: account_tx_context.tip().0 as u128,
+                paymaster_data: account_tx_context
+                    .paymaster_data()
+                    .0
+                    .iter()
+                    .map(|e| starkfelt_to_felt(*e))
+                    .collect(),
+                nonce_data_availability_mode: account_tx_context.nonce_data_availability_mode()
+                    as u32,
+                fee_data_availability_mode: account_tx_context.fee_data_availability_mode() as u32,
+                account_deployment_data: account_tx_context
+                    .account_deployment_data()
+                    .0
+                    .iter()
+                    .map(|e| starkfelt_to_felt(*e))
+                    .collect(),
             },
             caller_address: contract_address_to_felt(self.caller_address),
             contract_address: contract_address_to_felt(self.contract_address),
