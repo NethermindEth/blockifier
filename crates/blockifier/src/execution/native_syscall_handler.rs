@@ -1,8 +1,13 @@
+use std::iter::once;
 use std::sync::Arc;
 
 use cairo_native::starknet::{
-    BlockInfo, ExecutionInfoV2, StarkNetSyscallHandler, SyscallResult, TxInfo, TxV2Info,
+    BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarkNetSyscallHandler,
+    SyscallResult, TxInfo, TxV2Info, U256,
 };
+use k256::elliptic_curve::generic_array::GenericArray;
+use k256::elliptic_curve::sec1::{Coordinates, FromEncodedPoint, ToEncodedPoint};
+use k256::Scalar;
 use starknet_api::core::{
     calculate_contract_address, ClassHash, ContractAddress, EntryPointSelector, EthAddress,
     PatriciaKey,
@@ -15,7 +20,9 @@ use starknet_api::transaction::{
 };
 use starknet_types_core::felt::Felt;
 
-use super::sierra_utils::{chain_id_to_felt, contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt};
+use super::sierra_utils::{
+    chain_id_to_felt, contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt,
+};
 use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, MessageToL1, OrderedEvent, OrderedL2ToL1Message};
 use crate::execution::common_hints::ExecutionMode;
@@ -28,7 +35,8 @@ use crate::execution::syscalls::hint_processor::{
     execute_inner_call_raw, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_CALCULATE_CONTRACT_ADDRESS,
     FAILED_TO_EXECUTE_CALL, FAILED_TO_GET_CONTRACT_CLASS, FAILED_TO_PARSE, FAILED_TO_READ_RESULT,
     FAILED_TO_SET_CLASS_HASH, FAILED_TO_WRITE, FORBIDDEN_CLASS_REPLACEMENT, INVALID_ARGUMENT,
-    INVALID_EXECUTION_MODE_ERROR, INVALID_INPUT_LENGTH_ERROR,
+    INVALID_EXECUTION_MODE_ERROR, INVALID_INPUT_LENGTH_ERROR, INVALID_POINT, INVALID_SCALAR,
+    UNREACHABLE_ERROR,
 };
 use crate::state::state_api::State;
 
@@ -93,11 +101,12 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             sequencer_address: contract_address_to_felt(block_context.sequencer_address),
         };
 
-        let signature = account_tx_context.signature().0.into_iter().map(starkfelt_to_felt).collect();
+        let signature =
+            account_tx_context.signature().0.into_iter().map(starkfelt_to_felt).collect();
 
         let tx_info = TxInfo {
             version: starkfelt_to_felt(account_tx_context.version().0),
-            account_contract_address: contract_address_to_felt(account_tx_context.sender_address(),),
+            account_contract_address: contract_address_to_felt(account_tx_context.sender_address()),
             // todo(rodro): it is ok to unwrap as default? Also, will this be deprecated soon?
             max_fee: account_tx_context.max_fee().unwrap_or_default().0,
             signature,
@@ -134,7 +143,9 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             },
             tx_info: TxV2Info {
                 version: starkfelt_to_felt(account_tx_context.version().0),
-                account_contract_address: contract_address_to_felt(account_tx_context.sender_address()),
+                account_contract_address: contract_address_to_felt(
+                    account_tx_context.sender_address(),
+                ),
                 max_fee: account_tx_context.max_fee().unwrap_or_default().0,
                 signature: vec![],
                 transaction_hash: Default::default(),
@@ -388,11 +399,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         Ok(())
     }
 
-    fn keccak(
-        &mut self,
-        input: &[u64],
-        _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::U256> {
+    fn keccak(&mut self, input: &[u64], _remaining_gas: &mut u128) -> SyscallResult<U256> {
         let input_len = input.len();
 
         const KECCAK_FULL_RATE_IN_WORDS: usize = 17;
@@ -427,95 +434,125 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             hash[0..16].try_into().map_err(|_| vec![Felt::from_hex(FAILED_TO_PARSE).unwrap()])?,
         );
 
-        Ok(cairo_native::starknet::U256 { hi, lo })
+        Ok(U256 { hi, lo })
     }
 
     fn secp256k1_add(
         &mut self,
-        _p0: cairo_native::starknet::Secp256k1Point,
-        _p1: cairo_native::starknet::Secp256k1Point,
+        p0: Secp256k1Point,
+        p1: Secp256k1Point,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::Secp256k1Point> {
-        todo!("Native syscall handler - secp256k1_add") // unimplemented in cairo native
+    ) -> SyscallResult<Secp256k1Point> {
+        let p0 = K1Point::try_from(p0)?;
+        let p1 = K1Point::try_from(p1)?;
+
+        let result = K1Point::new(p0.point + p1.point);
+
+        Ok(result.try_into()?)
     }
 
     fn secp256k1_get_point_from_x(
         &mut self,
-        _x: cairo_native::starknet::U256,
-        _y_parity: bool,
+        x: U256,
+        y_parity: bool,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<Option<cairo_native::starknet::Secp256k1Point>> {
-        todo!("Native syscall handler - secp256k1_get_point_from_x") // unimplemented in cairo native
+    ) -> SyscallResult<Option<Secp256k1Point>> {
+        let point = K1Point::try_from((x, y_parity))?;
+
+        Ok(Some(point.try_into()?))
     }
 
     fn secp256k1_get_xy(
         &mut self,
-        _p: cairo_native::starknet::Secp256k1Point,
+        p: Secp256k1Point,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<(cairo_native::starknet::U256, cairo_native::starknet::U256)> {
-        todo!("Native syscall handler - secp256k1_get_xy") // unimplemented in cairo native
+    ) -> SyscallResult<(U256, U256)> {
+        Ok((p.x, p.y))
     }
 
     fn secp256k1_mul(
         &mut self,
-        _p: cairo_native::starknet::Secp256k1Point,
-        _m: cairo_native::starknet::U256,
+        p: Secp256k1Point,
+        m: U256,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::Secp256k1Point> {
-        todo!("Native syscall handler - secp256k1_mul") // unimplemented in cairo native
+    ) -> SyscallResult<Secp256k1Point> {
+        let p = K1Point::try_from(p)?;
+        let m = scalar_from_u256_k256(m)?;
+
+        let result = K1Point::new(p.point * m);
+
+        Ok(result.try_into()?)
     }
 
     fn secp256k1_new(
         &mut self,
-        _x: cairo_native::starknet::U256,
-        _y: cairo_native::starknet::U256,
+        x: U256,
+        y: U256,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<Option<cairo_native::starknet::Secp256k1Point>> {
-        todo!("Native syscall handler - secp256k1_new") // unimplemented in cairo native
+    ) -> SyscallResult<Option<Secp256k1Point>> {
+        let point = Secp256k1Point { x, y };
+        let guard = K1Point::try_from(point);
+
+        if guard.is_ok() { Ok(Some(point)) } else { Ok(None) }
     }
 
     fn secp256r1_add(
         &mut self,
-        _p0: cairo_native::starknet::Secp256r1Point,
-        _p1: cairo_native::starknet::Secp256r1Point,
+        p0: Secp256r1Point,
+        p1: Secp256r1Point,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::Secp256r1Point> {
-        todo!("Native syscall handler - secp256r1_add") // unimplemented in cairo native
+    ) -> SyscallResult<Secp256r1Point> {
+        let p0 = R1Point::try_from(p0)?;
+        let p1 = R1Point::try_from(p1)?;
+
+        let result = R1Point::new(p0.point + p1.point);
+
+        Ok(result.try_into()?)
     }
 
     fn secp256r1_get_point_from_x(
         &mut self,
-        _x: cairo_native::starknet::U256,
-        _y_parity: bool,
+        x: U256,
+        y_parity: bool,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<Option<cairo_native::starknet::Secp256r1Point>> {
-        todo!("Native syscall handler - secp256r1_get_point_from_x") // unimplemented in cairo native
+    ) -> SyscallResult<Option<Secp256r1Point>> {
+        let point = R1Point::try_from((x, y_parity))?;
+
+        Ok(Some(point.try_into()?))
     }
 
     fn secp256r1_get_xy(
         &mut self,
-        _p: cairo_native::starknet::Secp256r1Point,
+        p: Secp256r1Point,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<(cairo_native::starknet::U256, cairo_native::starknet::U256)> {
-        todo!("Native syscall handler - secp256r1_get_xy") // unimplemented in cairo native
+    ) -> SyscallResult<(U256, U256)> {
+        Ok((p.x, p.y))
     }
 
     fn secp256r1_mul(
         &mut self,
-        _p: cairo_native::starknet::Secp256r1Point,
-        _m: cairo_native::starknet::U256,
+        p: Secp256r1Point,
+        m: U256,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::Secp256r1Point> {
-        todo!("Native syscall handler - secp256r1_mul") // unimplemented in cairo native
+    ) -> SyscallResult<Secp256r1Point> {
+        let p = R1Point::try_from(p)?;
+        let m = scalar_from_u256_p256(m)?;
+
+        let result = R1Point::new(p.point * m);
+
+        Ok(result.try_into()?)
     }
 
     fn secp256r1_new(
         &mut self,
-        _x: cairo_native::starknet::U256,
-        _y: cairo_native::starknet::U256,
+        x: U256,
+        y: U256,
         _remaining_gas: &mut u128,
-    ) -> SyscallResult<Option<cairo_native::starknet::Secp256r1Point>> {
-        todo!("Native syscall handler - secp256r1_new") // unimplemented in cairo native
+    ) -> SyscallResult<Option<Secp256r1Point>> {
+        let point = Secp256r1Point { x, y };
+        let guard = R1Point::try_from(point);
+
+        if guard.is_ok() { Ok(Some(point)) } else { Ok(None) }
     }
 
     fn pop_log(&mut self) {
@@ -569,4 +606,260 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
     fn set_version(&mut self, _version: Felt) {
         todo!("Native syscall handler - set_version") // unimplemented in cairo native
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct K1Point {
+    pub point: k256::ProjectivePoint,
+}
+
+#[derive(Debug, Clone, Default)]
+pub enum PointError {
+    #[default]
+    InvalidPoint,
+    UnreachableError,
+}
+
+impl K1Point {
+    pub fn new(point: k256::ProjectivePoint) -> Self {
+        Self { point }
+    }
+}
+
+impl From<PointError> for Vec<Felt> {
+    fn from(e: PointError) -> Self {
+        vec![match e {
+            PointError::InvalidPoint => Felt::from_hex(INVALID_POINT).unwrap(),
+            PointError::UnreachableError => Felt::from_hex(UNREACHABLE_ERROR).unwrap(),
+        }]
+    }
+}
+
+impl TryFrom<Secp256k1Point> for K1Point {
+    type Error = PointError;
+
+    fn try_from(value: Secp256k1Point) -> Result<Self, Self::Error> {
+        let x = value.x;
+        let y = value.y;
+
+        Self::try_from((x, y))
+    }
+}
+
+impl TryFrom<(U256, U256)> for K1Point {
+    type Error = PointError;
+
+    fn try_from(value: (U256, U256)) -> Result<Self, Self::Error> {
+        let (x, y) = value;
+
+        let point = k256::ProjectivePoint::from_encoded_point(
+            &k256::EncodedPoint::from_affine_coordinates(
+                &GenericArray::from_exact_iter(
+                    x.hi.to_be_bytes().into_iter().chain(x.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+                &GenericArray::from_exact_iter(
+                    y.hi.to_be_bytes().into_iter().chain(y.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+                false,
+            ),
+        );
+
+        if bool::from(point.is_some()) {
+            Ok(Self { point: point.unwrap() })
+        } else {
+            Err(PointError::InvalidPoint)
+        }
+    }
+}
+
+impl TryInto<Secp256k1Point> for K1Point {
+    type Error = PointError;
+
+    fn try_into(self) -> Result<Secp256k1Point, Self::Error> {
+        let p = self.point.to_encoded_point(false);
+        let (x, y) = match p.coordinates() {
+            Coordinates::Uncompressed { x, y } => (x, y),
+            _ => {
+                return Err(PointError::UnreachableError);
+            }
+        };
+
+        let x: [u8; 32] = x.as_slice().try_into().map_err(|_| PointError::UnreachableError)?;
+        let y: [u8; 32] = y.as_slice().try_into().map_err(|_| PointError::UnreachableError)?;
+
+        Ok(Secp256k1Point {
+            x: U256 {
+                hi: u128::from_be_bytes(
+                    x[0..16].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+                lo: u128::from_be_bytes(
+                    x[16..32].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+            },
+            y: U256 {
+                hi: u128::from_be_bytes(
+                    y[0..16].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+                lo: u128::from_be_bytes(
+                    y[16..32].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+            },
+        })
+    }
+}
+
+impl TryFrom<(U256, bool)> for K1Point {
+    type Error = PointError;
+
+    fn try_from((x, y_parity): (U256, bool)) -> Result<Self, Self::Error> {
+        let point = k256::ProjectivePoint::from_encoded_point(
+            &k256::EncodedPoint::from_bytes(
+                k256::CompressedPoint::from_exact_iter(
+                    once(0x02 | y_parity as u8).chain(x.hi.to_be_bytes()).chain(x.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+            )
+            .map_err(|_| PointError::InvalidPoint)?,
+        );
+
+        if bool::from(point.is_some()) {
+            Ok(Self { point: point.unwrap() })
+        } else {
+            Err(PointError::InvalidPoint)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct R1Point {
+    pub point: p256::ProjectivePoint,
+}
+
+impl R1Point {
+    pub fn new(point: p256::ProjectivePoint) -> Self {
+        Self { point }
+    }
+}
+
+impl TryFrom<Secp256r1Point> for R1Point {
+    type Error = PointError;
+
+    fn try_from(value: Secp256r1Point) -> Result<Self, Self::Error> {
+        let x = value.x;
+        let y = value.y;
+
+        Self::try_from((x, y))
+    }
+}
+
+impl TryFrom<(U256, U256)> for R1Point {
+    type Error = PointError;
+
+    fn try_from(value: (U256, U256)) -> Result<Self, Self::Error> {
+        let (x, y) = value;
+
+        let point = p256::ProjectivePoint::from_encoded_point(
+            &p256::EncodedPoint::from_affine_coordinates(
+                &GenericArray::from_exact_iter(
+                    x.hi.to_be_bytes().into_iter().chain(x.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+                &GenericArray::from_exact_iter(
+                    y.hi.to_be_bytes().into_iter().chain(y.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+                false,
+            ),
+        );
+
+        if bool::from(point.is_some()) {
+            Ok(Self { point: point.unwrap() })
+        } else {
+            Err(PointError::InvalidPoint)
+        }
+    }
+}
+
+impl TryInto<Secp256r1Point> for R1Point {
+    type Error = PointError;
+
+    fn try_into(self) -> Result<Secp256r1Point, Self::Error> {
+        let p = self.point.to_encoded_point(false);
+        let (x, y) = match p.coordinates() {
+            Coordinates::Uncompressed { x, y } => (x, y),
+            _ => {
+                return Err(PointError::UnreachableError);
+            }
+        };
+
+        let x: [u8; 32] = x.as_slice().try_into().map_err(|_| PointError::UnreachableError)?;
+        let y: [u8; 32] = y.as_slice().try_into().map_err(|_| PointError::UnreachableError)?;
+
+        Ok(Secp256r1Point {
+            x: U256 {
+                hi: u128::from_be_bytes(
+                    x[0..16].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+                lo: u128::from_be_bytes(
+                    x[16..32].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+            },
+            y: U256 {
+                hi: u128::from_be_bytes(
+                    y[0..16].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+                lo: u128::from_be_bytes(
+                    y[16..32].try_into().map_err(|_| PointError::UnreachableError)?,
+                ),
+            },
+        })
+    }
+}
+
+impl TryFrom<(U256, bool)> for R1Point {
+    type Error = PointError;
+
+    fn try_from((x, y_parity): (U256, bool)) -> Result<Self, Self::Error> {
+        let point = p256::ProjectivePoint::from_encoded_point(
+            &p256::EncodedPoint::from_bytes(
+                p256::CompressedPoint::from_exact_iter(
+                    once(0x02 | y_parity as u8).chain(x.hi.to_be_bytes()).chain(x.lo.to_be_bytes()),
+                )
+                .ok_or(PointError::InvalidPoint)?,
+            )
+            .map_err(|_| PointError::InvalidPoint)?,
+        );
+
+        if bool::from(point.is_some()) {
+            Ok(Self { point: point.unwrap() })
+        } else {
+            Err(PointError::InvalidPoint)
+        }
+    }
+}
+
+pub fn scalar_from_u256_k256(scalar: U256) -> Result<Scalar, Vec<Felt>> {
+    let mut bytes = [0u8; 32];
+    bytes[0..16].copy_from_slice(&scalar.hi.to_be_bytes());
+    bytes[16..32].copy_from_slice(&scalar.lo.to_be_bytes());
+
+    let scalar: Scalar = k256::elliptic_curve::ScalarPrimitive::from_slice(&bytes)
+        .map_err(|_| vec![Felt::from_hex(INVALID_SCALAR).unwrap()])?
+        .into();
+
+    Ok(scalar)
+}
+
+pub fn scalar_from_u256_p256(scalar: U256) -> Result<p256::Scalar, Vec<Felt>> {
+    let mut bytes = [0u8; 32];
+    bytes[0..16].copy_from_slice(&scalar.hi.to_be_bytes());
+    bytes[16..32].copy_from_slice(&scalar.lo.to_be_bytes());
+
+    let scalar: p256::Scalar = p256::elliptic_curve::ScalarPrimitive::from_slice(&bytes)
+        .map_err(|_| vec![Felt::from_hex(INVALID_SCALAR).unwrap()])?
+        .into();
+
+    Ok(scalar)
 }
