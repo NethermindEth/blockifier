@@ -2,7 +2,9 @@ use starknet_api::core::{ClassHash, ContractAddress, PatriciaKey};
 use starknet_api::hash::StarkHash;
 use starknet_api::{class_hash, contract_address, patricia_key};
 
-use crate::execution::contract_class::{ContractClass, ContractClassV0, ContractClassV1};
+use crate::execution::contract_class::{
+    ContractClass, ContractClassV0, ContractClassV1, SierraContractClassV1,
+};
 use crate::test_utils::{get_raw_contract_class, CairoVersion};
 
 // Bit to set on class hashes and addresses of feature contracts to indicate the Cairo1 variant.
@@ -67,6 +69,7 @@ impl FeatureContract {
         match self.cairo_version() {
             CairoVersion::Cairo0 => 0,
             CairoVersion::Cairo1 => CAIRO1_BIT,
+            CairoVersion::Sierra => CAIRO1_BIT,
         }
     }
 
@@ -98,16 +101,28 @@ impl FeatureContract {
             // ERC20 is a special case - not in the feature_contracts directory.
             Self::ERC20 => return ERC20_CONTRACT_PATH.into(),
         };
+
+        // todo: refactor this, think about a better way to handle this
+        if contract_name == "test_contract" && matches!(cairo_version, CairoVersion::Sierra) {
+            return "./feature_contracts/cairo2/target/dev/\
+                    sierra_test_contract_SierraTestContract.contract_class.json"
+                .into();
+        }
+
         format!(
             "./feature_contracts/cairo{}/compiled/{}{}.json",
             match cairo_version {
                 CairoVersion::Cairo0 => "0",
-                CairoVersion::Cairo1 => "1",
+                CairoVersion::Cairo1 | CairoVersion::Sierra => "1",
             },
-            contract_name,
+            match cairo_version {
+                CairoVersion::Cairo0 | CairoVersion::Cairo1 => contract_name.to_string(),
+                CairoVersion::Sierra => format!("sierra_{}", contract_name),
+            },
             match cairo_version {
                 CairoVersion::Cairo0 => "_compiled",
                 CairoVersion::Cairo1 => ".casm",
+                CairoVersion::Sierra => ".sierra",
             }
         )
     }
@@ -138,6 +153,9 @@ impl FeatureContract {
         match self.cairo_version() {
             CairoVersion::Cairo0 => ContractClassV0::from_file(&self.get_compiled_path()).into(),
             CairoVersion::Cairo1 => ContractClassV1::from_file(&self.get_compiled_path()).into(),
+            CairoVersion::Sierra => {
+                SierraContractClassV1::from_file(&self.get_compiled_path()).into()
+            }
         }
     }
 

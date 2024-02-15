@@ -95,8 +95,9 @@ pub const TEST_CONTRACT_CAIRO0_PATH: &str =
     "./feature_contracts/cairo0/compiled/test_contract_compiled.json";
 pub const TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/test_contract.casm.json";
-pub const TEST_CONTRACT_SIERRA_PATH: &str =
-    "./feature_contracts/cairo1/compiled/sierra_test_contract.sierra.json";
+pub const TEST_CONTRACT_SIERRA_PATH: &str = "./feature_contracts/cairo2/target/dev/\
+                                             sierra_test_contract_SierraTestContract.\
+                                             contract_class.json";
 pub const LEGACY_TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/legacy_test_contract.casm.json";
 pub const SECURITY_TEST_CONTRACT_CAIRO0_PATH: &str =
@@ -116,6 +117,7 @@ pub const ERC20_FULL_CONTRACT_PATH: &str =
 pub enum CairoVersion {
     Cairo0,
     Cairo1,
+    Sierra,
 }
 
 impl Default for CairoVersion {
@@ -377,6 +379,15 @@ macro_rules! check_transaction_execution_error_for_invalid_scenario {
                     )
                 }
             }
+            CairoVersion::Sierra => {
+                if let TransactionExecutionError::ValidateTransactionError(error) = $error {
+                    assert_eq!(
+                        error.to_string(),
+                        "Execution failed. Failure reason: 0x496e76616c6964207363656e6172696f \
+                         ('Invalid scenario')."
+                    )
+                }
+            }
         }
     };
 }
@@ -422,9 +433,8 @@ pub fn deploy_contract(
 
     let class_hash = ClassHash(felt_to_starkfelt(class_hash));
 
-    let wrapper_calldata = Calldata(Arc::new(
-        calldata.iter().map(|felt| felt_to_starkfelt(*felt)).collect(),
-    ));
+    let wrapper_calldata =
+        Calldata(Arc::new(calldata.iter().map(|felt| felt_to_starkfelt(*felt)).collect()));
 
     let calculated_contract_address = calculate_contract_address(
         ContractAddressSalt(felt_to_starkfelt(contract_address_salt)),
@@ -478,9 +488,8 @@ pub fn prepare_erc20_deploy_test_state() -> (ContractAddress, CachedState<DictSt
     )
     .unwrap();
 
-    let contract_address = ContractAddress(
-        PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap(),
-    );
+    let contract_address =
+        ContractAddress(PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap());
 
     (contract_address, state)
 }

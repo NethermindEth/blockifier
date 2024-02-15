@@ -95,14 +95,16 @@ fn expected_validate_call_info(
 ) -> Option<CallInfo> {
     let retdata = match cairo_version {
         CairoVersion::Cairo0 => Retdata::default(),
-        CairoVersion::Cairo1 => retdata!(stark_felt!(constants::VALIDATE_RETDATA)),
+        CairoVersion::Cairo1 | CairoVersion::Sierra => {
+            retdata!(stark_felt!(constants::VALIDATE_RETDATA))
+        }
     };
     // Extra range check in regular (invoke) validate call, due to passing the calldata as an array.
     let n_range_checks = match cairo_version {
         CairoVersion::Cairo0 => {
             usize::from(entry_point_selector_name == constants::VALIDATE_ENTRY_POINT_NAME)
         }
-        CairoVersion::Cairo1 => {
+        CairoVersion::Cairo1 | CairoVersion::Sierra => {
             if entry_point_selector_name == constants::VALIDATE_ENTRY_POINT_NAME { 7 } else { 2 }
         }
     };
@@ -981,7 +983,7 @@ fn declare_n_steps(version: TransactionVersion, declared_contract_version: Cairo
     } else {
         match declared_contract_version {
             CairoVersion::Cairo0 => 2921,
-            CairoVersion::Cairo1 => 2959,
+            CairoVersion::Cairo1 | CairoVersion::Sierra => 2959,
         }
     }
 }

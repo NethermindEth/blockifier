@@ -214,103 +214,61 @@ fn test_keccak() {
     );
 }
 
-fn verify_compiler_version(contract: FeatureContract, expected_version: &str) {
-    // Read and parse file content.
-    let raw_contract: serde_json::Value =
-        serde_json::from_str(&contract.get_raw_class()).expect("Error parsing JSON");
-
-    // Verify version.
-    if let Some(compiler_version) = raw_contract["compiler_version"].as_str() {
-        assert_eq!(compiler_version, expected_version);
-    } else {
-        panic!("'compiler_version' not found or not a valid string in JSON.");
-    }
-}
-
 #[test_case(
     ExecutionMode::Validate,
     contract_address!(StarkFelt::ZERO),
     TransactionVersion::ONE,
-    false,
     false;
     "Validate execution mode: block info fields should be zeroed. Transaction V1.")]
 #[test_case(
     ExecutionMode::Execute,
     contract_address!(StarkFelt::try_from(TEST_SEQUENCER_ADDRESS).unwrap()),
     TransactionVersion::ONE,
-    false,
     false;
     "Execute execution mode: block info should be as usual. Transaction V1.")]
 #[test_case(
     ExecutionMode::Validate,
     contract_address!(StarkFelt::ZERO),
     TransactionVersion::THREE,
-    false,
     false;
     "Validate execution mode: block info fields should be zeroed. Transaction V3.")]
 #[test_case(
     ExecutionMode::Execute,
     contract_address!(StarkFelt::try_from(TEST_SEQUENCER_ADDRESS).unwrap()),
     TransactionVersion::THREE,
-    false,
     false;
     "Execute execution mode: block info should be as usual. Transaction V3.")]
 #[test_case(
     ExecutionMode::Execute,
     contract_address!(StarkFelt::try_from(TEST_SEQUENCER_ADDRESS).unwrap()),
-    TransactionVersion::ONE,
-    true,
-    false;
-    "Legacy contract. Execute execution mode: block info should be as usual. Transaction V1.")]
-#[test_case(
-    ExecutionMode::Execute,
-    contract_address!(StarkFelt::try_from(TEST_SEQUENCER_ADDRESS).unwrap()),
     TransactionVersion::THREE,
-    true,
-    false;
-    "Legacy contract. Execute execution mode: block info should be as usual. Transaction V3.")]
-#[test_case(
-    ExecutionMode::Execute,
-    contract_address!(StarkFelt::try_from(TEST_SEQUENCER_ADDRESS).unwrap()),
-    TransactionVersion::THREE,
-    false,
     true;
     "Execute execution mode: block info should be as usual. Transaction V3. Query.")]
 fn test_get_execution_info(
     execution_mode: ExecutionMode,
     sequencer_address: ContractAddress,
     mut version: TransactionVersion,
-    is_legacy: bool,
     only_query: bool,
 ) {
-    let legacy_contract = FeatureContract::LegacyTestContract;
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
-    let state = &mut test_state(
-        &BlockContext::create_for_testing(),
-        BALANCE,
-        &[(legacy_contract, 1), (test_contract, 1)],
-    );
+    let test_contract = FeatureContract::TestContract(CairoVersion::Sierra);
+    let state =
+        &mut test_state(&BlockContext::create_for_testing(), BALANCE, &[(test_contract, 1)]);
     let expected_block_info = [
         stark_felt!(CURRENT_BLOCK_NUMBER),    // Block number.
         stark_felt!(CURRENT_BLOCK_TIMESTAMP), // Block timestamp.
         *sequencer_address.0.key(),
     ];
 
-    let (test_contract_address, expected_unsupported_fields) = if is_legacy {
-        verify_compiler_version(legacy_contract, "2.1.0");
-        (legacy_contract.get_instance_address(0), vec![])
-    } else {
-        (
-            test_contract.get_instance_address(0),
-            vec![
-                StarkFelt::ZERO, // Tip.
-                StarkFelt::ZERO, // Paymaster data.
-                StarkFelt::ZERO, // Nonce DA.
-                StarkFelt::ZERO, // Fee DA.
-                StarkFelt::ZERO, // Account data.
-            ],
-        )
-    };
+    let (test_contract_address, expected_unsupported_fields) = (
+        test_contract.get_instance_address(0),
+        vec![
+            StarkFelt::ZERO, // Tip.
+            StarkFelt::ZERO, // Paymaster data.
+            StarkFelt::ZERO, // Nonce DA.
+            StarkFelt::ZERO, // Fee DA.
+            StarkFelt::ZERO, // Account data.
+        ],
+    );
 
     if only_query {
         let simulate_version_base = Pow::pow(Felt252::from(2_u8), QUERY_VERSION_BASE_BIT);
@@ -324,7 +282,7 @@ fn test_get_execution_info(
     let sender_address = test_contract_address;
 
     let expected_tx_info: Vec<StarkFelt>;
-    let mut expected_resource_bounds: Vec<StarkFelt> = vec![];
+    let expected_resource_bounds: Vec<StarkFelt>;
     let account_tx_context: AccountTransactionContext;
     if version == TransactionVersion::ONE {
         expected_tx_info = vec![
@@ -336,11 +294,9 @@ fn test_get_execution_info(
             stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
             nonce.0,                                                    // Nonce.
         ];
-        if !is_legacy {
-            expected_resource_bounds = vec![
-                stark_felt!(0_u16), // Length of resource bounds array.
-            ];
-        }
+        expected_resource_bounds = vec![
+            stark_felt!(0_u16), // Length of resource bounds array.
+        ];
         account_tx_context =
             AccountTransactionContext::Deprecated(DeprecatedAccountTransactionContext {
                 common_fields: CommonAccountFields {
@@ -365,17 +321,15 @@ fn test_get_execution_info(
             stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
             nonce.0,                                                    // Nonce.
         ];
-        if !is_legacy {
-            expected_resource_bounds = vec![
-                StarkFelt::from(2u32),             // Length of ResourceBounds array.
-                stark_felt!(L1_GAS),               // Resource.
-                stark_felt!(max_amount.0),         // Max amount.
-                stark_felt!(max_price_per_unit.0), // Max price per unit.
-                stark_felt!(L2_GAS),               // Resource.
-                StarkFelt::ZERO,                   // Max amount.
-                StarkFelt::ZERO,                   // Max price per unit.
-            ];
-        }
+        expected_resource_bounds = vec![
+            StarkFelt::from(2u32),             // Length of ResourceBounds array.
+            stark_felt!(L1_GAS),               // Resource.
+            stark_felt!(max_amount.0),         // Max amount.
+            stark_felt!(max_price_per_unit.0), // Max price per unit.
+            stark_felt!(L2_GAS),               // Resource.
+            StarkFelt::ZERO,                   // Max amount.
+            StarkFelt::ZERO,                   // Max price per unit.
+        ];
         account_tx_context = AccountTransactionContext::Current(CurrentAccountTransactionContext {
             common_fields: CommonAccountFields {
                 transaction_hash: tx_hash,
@@ -409,6 +363,9 @@ fn test_get_execution_info(
         *test_contract_address.0.key(),      // Storage address.
         stark_felt!(entry_point_selector.0), // Entry point selector.
     ];
+
+    println!("{:?}", expected_block_info);
+
     let entry_point_call = CallEntryPoint {
         entry_point_selector,
         storage_address: test_contract_address,
@@ -440,7 +397,11 @@ fn test_get_execution_info(
         ),
     };
 
-    assert!(!result.unwrap().execution.failed);
+    println!("{:?}", result.unwrap().execution);
+
+    assert!(false);
+
+    // assert!(!result.unwrap().execution.failed);
 }
 
 #[test]

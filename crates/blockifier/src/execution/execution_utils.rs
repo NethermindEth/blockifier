@@ -65,14 +65,18 @@ pub fn execute_entry_point_call(
                 context,
             )
         }
-        ContractClass::V1(contract_class) => entry_point_execution::execute_entry_point_call(
-            call,
-            contract_class,
-            state,
-            resources,
-            context,
-        ),
+        ContractClass::V1(contract_class) => {
+            println!("Executing in Cairo-VM");
+            entry_point_execution::execute_entry_point_call(
+                call,
+                contract_class,
+                state,
+                resources,
+                context,
+            )
+        }
         ContractClass::V1Sierra(contract_class) => {
+            println!("Executing in Cairo-Native");
             native_entry_point_execution::execute_entry_point_call(
                 call,
                 contract_class,

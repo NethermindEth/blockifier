@@ -44,7 +44,7 @@ pub fn match_entrypoint(
         EntryPointType::External => &contract_entrypoints.external,
         EntryPointType::L1Handler => &contract_entrypoints.l1_handler,
     };
-    
+
     entrypoints
         .iter()
         .find(|entrypoint| cmp_selector_to_entrypoint(entrypoint_selector, entrypoint))
@@ -75,7 +75,7 @@ static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext>
 // }
 pub fn get_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
     Rc::new(RefCell::new(ProgramCache::Jit(JitProgramCache::new(
-        NATIVE_CONTEXT.get_or_init(NativeContext::new)
+        NATIVE_CONTEXT.get_or_init(NativeContext::new),
     ))))
 }
 
@@ -97,16 +97,16 @@ pub fn get_native_executor<'context>(
             let cached_executor = cache.get(&class_hash);
             NativeExecutor::Aot(match cached_executor {
                 Some(executor) => executor,
-                None => cache.compile_and_insert(class_hash, program, OptLevel::Default)
+                None => cache.compile_and_insert(class_hash, program, OptLevel::Default),
             })
         }
         ProgramCache::Jit(cache) => {
             let cached_executor = cache.get(&class_hash);
             NativeExecutor::Jit(match cached_executor {
                 Some(executor) => executor,
-                None => cache.compile_and_insert(class_hash, program, OptLevel::Default)
+                None => cache.compile_and_insert(class_hash, program, OptLevel::Default),
             })
-        },
+        }
     }
 }
 
@@ -162,13 +162,15 @@ pub fn contract_address_to_felt(contract_address: ContractAddress) -> Felt {
     Felt::from_bytes_be_slice(contract_address.0.key().bytes())
 }
 
-pub fn contract_entrypoint_to_entrypoint_selector(entrypoint: &ContractEntryPoint) -> EntryPointSelector {
+pub fn contract_entrypoint_to_entrypoint_selector(
+    entrypoint: &ContractEntryPoint,
+) -> EntryPointSelector {
     let selector_felt = Felt::from_bytes_be_slice(&entrypoint.selector.to_be_bytes());
     EntryPointSelector(felt_to_starkfelt(selector_felt))
 }
 
 pub fn chain_id_to_felt(chain_id: &ChainId) -> Result<Felt, FromStrError> {
-    Felt::from_hex(&chain_id.as_hex())
+    Ok(Felt::from_bytes_be_slice(chain_id.0.as_bytes()))
 }
 
 pub fn parse_starkfelt_string(felt: StarkFelt) -> String {
@@ -215,7 +217,7 @@ pub fn run_native_executor(
                     return_values: vec![],
                     error_msg: Some("error".to_string()),
                 })
-        },
+        }
     }
 }
 
