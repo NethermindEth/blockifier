@@ -147,7 +147,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             });
         }
 
-        Ok(ExecutionInfoV2 {
+        let result = (ExecutionInfoV2 {
             block_info: BlockInfo {
                 block_number: block_context.block_number.0,
                 block_timestamp: block_context.block_timestamp.0,
@@ -191,7 +191,16 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             caller_address: contract_address_to_felt(self.caller_address),
             contract_address: contract_address_to_felt(self.contract_address),
             entry_point_selector: starkfelt_to_felt(self.entry_point_selector),
-        })
+        });
+
+        println!("Returned ExecutionInfo from syscall: {:?}", result);
+
+        println!(
+            "Returned Account Contract address from ExecutionInfoV2 syscall : {:?}",
+            result.tx_info.account_contract_address.to_string()
+        );
+
+        Ok(result)
     }
 
     fn deploy(

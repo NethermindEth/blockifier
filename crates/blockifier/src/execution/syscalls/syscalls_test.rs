@@ -364,11 +364,13 @@ fn test_get_execution_info(
         stark_felt!(entry_point_selector.0), // Entry point selector.
     ];
 
-    println!("{:?}", expected_block_info);
+    println!("Expected BlockInfo: {:?}", expected_block_info);
+    println!("Expected Account Contract Address: {:?}", test_contract_address.0.key().to_string());
 
     let entry_point_call = CallEntryPoint {
         entry_point_selector,
         storage_address: test_contract_address,
+        caller_address: sender_address,
         calldata: Calldata(
             [
                 expected_block_info.to_vec(),
@@ -387,17 +389,30 @@ fn test_get_execution_info(
         ExecutionMode::Validate => entry_point_call
             .execute_directly_given_account_context_in_validate_mode(
                 state,
-                account_tx_context,
+                account_tx_context.clone(),
                 false,
             ),
         ExecutionMode::Execute => entry_point_call.execute_directly_given_account_context(
             state,
-            account_tx_context,
+            account_tx_context.clone(),
             false,
         ),
     };
 
-    println!("{:?}", result.unwrap().execution);
+    println!("Exucution result: {:?}", result.unwrap().execution);
+
+    let entry_point_call = CallEntryPoint {
+        storage_address: test_contract_address,
+        caller_address: sender_address,
+        entry_point_selector: selector_from_name("get_account_address"),
+        calldata: calldata![],
+        ..trivial_external_entry_point()
+    };
+
+    let result =
+        entry_point_call.execute_directly_given_account_context(state, account_tx_context, false);
+
+    println!("Returned AccountContext from Cairo: {:?}", result.unwrap().execution);
 
     assert!(false);
 
