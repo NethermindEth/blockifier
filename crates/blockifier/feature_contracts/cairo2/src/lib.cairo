@@ -91,7 +91,7 @@ mod SierraTestContract {
 
         assert(block_info.block_number == expected_block_info.block_number, 'BLOCK_NUMBER.MISMATCH');
         assert(block_info.block_timestamp == expected_block_info.block_timestamp, 'BLOCK_TIMESTAMP.MISMATCH');
-        assert(block_info.sequencer_address == expected_block_info.sequencer_address, 'SEQUENCER_ADDERSS.MISMATCH');
+        assert(block_info.sequencer_address == expected_block_info.sequencer_address, 'SEQUENCER_ADDRESS.MISMATCH');
 
         assert(block_info == expected_block_info, 'BLOCK_INFO_MISMATCH');
 
@@ -122,6 +122,11 @@ mod SierraTestContract {
             execution_info.entry_point_selector == expected_entry_point_selector,
             'SELECTOR_MISMATCH'
         );
+    }
+
+    #[external(v0)]
+    fn get_account_address(self: @ContractState) -> felt252 {
+        get_execution_info().unbox().tx_info.unbox().account_contract_address.into()
     }
 
     #[external(v0)]
