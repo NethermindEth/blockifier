@@ -399,7 +399,7 @@ fn test_get_execution_info(
         ),
     };
 
-    println!("Exucution result: {:?}", result.unwrap().execution);
+    println!("Execution result: {:?}", result.unwrap().execution);
 
     let entry_point_call = CallEntryPoint {
         storage_address: test_contract_address,
