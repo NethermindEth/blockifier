@@ -3,7 +3,10 @@
 /logs
 build
 dist
+
 target
+!crates/blockifier/feature_contracts/cairo2/target
+
 */.vscode/*
 *.DS_Store
 
