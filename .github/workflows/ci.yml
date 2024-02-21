@@ -28,6 +28,8 @@ jobs:
         run: sudo apt-get install llvm-17 llvm-17-dev llvm-17-runtime clang-17 clang-tools-17 lld-17 libpolly-17-dev libmlir-17-dev mlir-17-tools
       - name: Install gmplib
         run: sudo apt install -y libgmp3-dev
+      - name: Install scarb
+        run: curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.4.4
       - uses: actions/checkout@v3
         with:
           repository: 'lambdaclass/cairo_native'
