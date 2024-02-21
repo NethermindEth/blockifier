@@ -40,4 +40,6 @@ jobs:
           cargo build --release &&
           cd ../.. &&
           cd crates/blockifier && 
+          cd feature_contracts/cairo2 && 
+          scarb build &&
           cargo test --test erc20_tests --features testing
