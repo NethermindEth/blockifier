@@ -35,7 +35,7 @@ use crate::abi::constants::{self};
 use crate::block_context::BlockContext;
 use crate::execution::call_info::{CallInfo, OrderedEvent};
 use crate::execution::common_hints::ExecutionMode;
-use crate::execution::contract_class::{ContractClass, ContractClassV0};
+use crate::execution::contract_class::{ContractClass, ContractClassV0, SierraContractClassV1};
 use crate::execution::entry_point::{
     CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
 };
@@ -48,7 +48,6 @@ use crate::execution::syscalls::hint_processor::{
 };
 use crate::state::cached_state::CachedState;
 use crate::state::state_api::State;
-use crate::test_utils::cached_state::get_erc20_class_hash_mapping;
 use crate::test_utils::dict_state_reader::DictStateReader;
 use crate::transaction::objects::AccountTransactionContext;
 use crate::utils::const_max;
@@ -112,6 +111,8 @@ pub const ERC20_CONTRACT_PATH: &str =
     "./ERC20_without_some_syscalls/ERC20/erc20_contract_without_some_syscalls_compiled.json";
 pub const ERC20_FULL_CONTRACT_PATH: &str =
     "./oz_erc20/target/dev/oz_erc20_OZ_ERC20.contract_class.json";
+pub const YAS_ERC20_CONTRACT_PATH: &str =
+    "./feature_contracts/yet-another-swap/target/dev/yas_core_ERC20.contract_class.json";
 
 #[derive(Clone, Copy, Debug)]
 pub enum CairoVersion {
@@ -410,15 +411,13 @@ pub fn create_calldata(
     Calldata(calldata.into())
 }
 
-pub fn create_erc20_deploy_test_state() -> CachedState<DictStateReader> {
-    let address_to_class_hash: HashMap<ContractAddress, ClassHash> = HashMap::from([(
-        contract_address!(TEST_ERC20_FULL_CONTRACT_ADDRESS),
-        class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
-    )]);
-
+pub fn create_custom_deploy_test_state(
+    address_to_class_hash: Vec<(ContractAddress, ClassHash)>,
+    class_hash_to_class: Vec<(ClassHash, ContractClass)>,
+) -> CachedState<DictStateReader> {
     CachedState::from(DictStateReader {
-        address_to_class_hash,
-        class_hash_to_class: get_erc20_class_hash_mapping(),
+        address_to_class_hash: HashMap::from_iter(address_to_class_hash),
+        class_hash_to_class: HashMap::from_iter(class_hash_to_class),
         ..Default::default()
     })
 }
@@ -473,25 +472,94 @@ pub fn deploy_contract(
 }
 
 pub fn prepare_erc20_deploy_test_state() -> (ContractAddress, CachedState<DictStateReader>) {
-    let mut state = create_erc20_deploy_test_state();
+    ERC20Factory::new().create_state()
+}
 
-    let class_hash = Felt::from_hex(TEST_ERC20_FULL_CONTRACT_CLASS_HASH).unwrap();
+pub trait StateFactory {
+    fn get_state(&self) -> CachedState<DictStateReader>;
 
-    let (contract_address, _) = deploy_contract(
-        &mut state,
-        class_hash,
-        Felt::from(0),
-        &[
-            contract_address_to_felt(Signers::Alice.into()), // Recipient
-            contract_address_to_felt(Signers::Alice.into()), // Owner
-        ],
-    )
-    .unwrap();
+    fn create_state(&self) -> (ContractAddress, CachedState<DictStateReader>) {
+        let mut state = self.get_state();
 
-    let contract_address =
-        ContractAddress(PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap());
+        let class_hash = Felt::from_hex(TEST_ERC20_FULL_CONTRACT_CLASS_HASH).unwrap();
 
-    (contract_address, state)
+        let (contract_address, _) =
+            deploy_contract(&mut state, class_hash, Felt::from(0), self.args().as_slice()).unwrap();
+
+        let contract_address =
+            ContractAddress(PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap());
+
+        (contract_address, state)
+    }
+
+    fn args(&self) -> Vec<Felt> {
+        vec![]
+    }
+}
+
+pub struct ERC20Factory {
+    args: Vec<Felt>,
+    #[allow(dead_code)]
+    state: CachedState<DictStateReader>,
+}
+
+impl ERC20Factory {
+    pub fn new() -> Self {
+        ERC20Factory {
+            args: vec![
+                contract_address_to_felt(Signers::Alice.into()), // Recipient
+                contract_address_to_felt(Signers::Alice.into()), // Owner
+            ],
+            state: create_custom_deploy_test_state(vec![], vec![]),
+        }
+    }
+}
+
+impl StateFactory for ERC20Factory {
+    fn get_state(&self) -> CachedState<DictStateReader> {
+        create_custom_deploy_test_state(
+            vec![(
+                contract_address!(TEST_ERC20_FULL_CONTRACT_ADDRESS),
+                class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
+            )],
+            vec![(
+                class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
+                SierraContractClassV1::from_file(ERC20_FULL_CONTRACT_PATH).into(),
+            )],
+        )
+    }
+
+    fn args(&self) -> Vec<Felt> {
+        self.args.clone()
+    }
+}
+
+pub struct YASERC20Factory {
+    args: Vec<Felt>,
+    #[allow(dead_code)]
+    state: CachedState<DictStateReader>,
+}
+
+impl YASERC20Factory {
+    pub fn new(args: Vec<Felt>) -> Self {
+        YASERC20Factory { args, state: create_custom_deploy_test_state(vec![], vec![]) }
+    }
+}
+
+impl StateFactory for YASERC20Factory {
+    fn get_state(&self) -> CachedState<DictStateReader> {
+        create_custom_deploy_test_state(
+            vec![],
+            vec![(
+                class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
+                SierraContractClassV1::from_file(ERC20_FULL_CONTRACT_PATH).into(),
+            )],
+        )
+    }
+
+    fn args(&self) -> Vec<Felt> {
+        self.args.clone()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -551,8 +619,8 @@ pub struct TestContext {
 }
 
 impl TestContext {
-    pub fn new() -> Self {
-        let (contract_address, state) = prepare_erc20_deploy_test_state();
+    pub fn new<T: StateFactory>(state_factory: T) -> Self {
+        let (contract_address, state) = state_factory.create_state();
         Self { contract_address, state, caller_address: contract_address, events: vec![] }
     }
 
@@ -584,7 +652,7 @@ impl TestContext {
             code_address: Some(self.contract_address),
             storage_address: self.contract_address,
             caller_address: self.caller_address,
-            ..erc20_external_entry_point()
+            ..external_entry_point(Some(self.contract_address))
         };
 
         let result = entry_point_call.execute_directly(&mut self.state).unwrap();
