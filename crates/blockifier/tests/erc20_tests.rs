@@ -3,7 +3,7 @@
 use blockifier::execution::sierra_utils::{
     contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt,
 };
-use blockifier::test_utils::*;
+use blockifier::test_utils::testing_context::*;
 use itertools::Itertools;
 use pretty_assertions::assert_str_eq;
 use starknet_api::hash::StarkFelt;
@@ -684,7 +684,7 @@ pub mod mintable_tests {
         let address_to_mint_to = Signers::Bob;
         let owner = Signers::Alice;
 
-        let mut context = TestContext::new().with_caller(owner.into());
+        let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
         assert_eq!(
             context.call_entry_point(
@@ -770,7 +770,8 @@ pub mod burnable_tests {
     fn test_burn_emits_event() {
         let address_to_burn_from = Signers::Alice;
 
-        let mut context = TestContext::new().with_caller(address_to_burn_from.into());
+        let mut context =
+            TestContext::new(ERC20Factory::new()).with_caller(address_to_burn_from.into());
 
         assert_eq!(
             context.call_entry_point(
@@ -836,7 +837,7 @@ pub mod ownable_tests {
         let current_owner = Signers::Alice;
         let new_owner = Signers::Bob;
 
-        let mut context = TestContext::new().with_caller(current_owner.into());
+        let mut context = TestContext::new(ERC20Factory::new()).with_caller(current_owner.into());
 
         assert_eq!(context.call_entry_point("transfer_ownership", vec![new_owner.into()]), vec![]);
 
@@ -856,7 +857,7 @@ mod pausable_tests {
     fn test_pause_unpause() {
         let owner = Signers::Alice;
 
-        let mut context = TestContext::new().with_caller(owner.into());
+        let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
         assert_eq!(context.call_entry_point("is_paused", vec![]), vec![Felt::from(false)]);
 
@@ -871,7 +872,7 @@ mod pausable_tests {
     fn test_pause_unpause_emits_event() {
         let owner = Signers::Alice;
 
-        let mut context = TestContext::new().with_caller(owner.into());
+        let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
         assert_eq!(context.call_entry_point("pause", vec![]), vec![]);
 
@@ -893,17 +894,34 @@ mod pausable_tests {
 
 #[cfg(test)]
 mod upgradable_tests {
+    use blockifier::execution::contract_class::ContractClassV1;
+    use blockifier::test_utils::{TEST_EMPTY_CONTRACT_CAIRO1_PATH, TEST_EMPTY_CONTRACT_CLASS_HASH};
+    use starknet_api::class_hash;
+    use starknet_api::core::ClassHash;
+    use starknet_api::hash::StarkHash;
+
     use super::*;
 
+    // TODO: Fix this test, broke after updating to latest cairo-native
     #[test]
     fn test_upgrade_emits_event() {
         let owner = Signers::Alice;
 
         let code_hash = Felt::from_hex(TEST_EMPTY_CONTRACT_CLASS_HASH).unwrap();
 
-        let mut context = TestContext::new().with_caller(owner.into());
+        let mut context = TestContext::new(ERC20Factory::new_with_test_state_args(
+            vec![],
+            vec![(
+                class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
+                ContractClassV1::from_file(TEST_EMPTY_CONTRACT_CAIRO1_PATH).into(),
+            )],
+        ))
+        .with_caller(owner.into());
 
-        assert_eq!(context.call_entry_point("upgrade", vec![felt_to_starkfelt(code_hash)]), vec![]);
+        let result = context.call_entry_point("upgrade", vec![felt_to_starkfelt(code_hash)]);
+
+        println!("{:?}", result.first().unwrap().to_hex_string());
+        assert_eq!(result, vec![]);
 
         let event = context.get_event(0).unwrap();
 
