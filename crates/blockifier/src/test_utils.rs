@@ -422,9 +422,8 @@ pub fn deploy_contract(
 
     let class_hash = ClassHash(felt_to_starkfelt(class_hash));
 
-    let wrapper_calldata = Calldata(Arc::new(
-        calldata.iter().map(|felt| felt_to_starkfelt(*felt)).collect(),
-    ));
+    let wrapper_calldata =
+        Calldata(Arc::new(calldata.iter().map(|felt| felt_to_starkfelt(*felt)).collect()));
 
     let calculated_contract_address = calculate_contract_address(
         ContractAddressSalt(felt_to_starkfelt(contract_address_salt)),
@@ -478,9 +477,8 @@ pub fn prepare_erc20_deploy_test_state() -> (ContractAddress, CachedState<DictSt
     )
     .unwrap();
 
-    let contract_address = ContractAddress(
-        PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap(),
-    );
+    let contract_address =
+        ContractAddress(PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap());
 
     (contract_address, state)
 }
