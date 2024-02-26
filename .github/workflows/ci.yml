@@ -16,6 +16,10 @@ on:
       - auto_merge_enabled
       - edited
 jobs:
+  env:
+    MLIR_SYS_170_PREFIX: /usr/lib/llvm-17
+    LLVM_SYS_170_PREFIX: /usr/lib/llvm-17
+    TABLEGEN_170_PREFIX: /usr/lib/llvm-17
   commitlint:
     runs-on: ubuntu-latest
     steps:
@@ -67,10 +71,10 @@ jobs:
       - run: cargo test
 
   erc20-native-tests:
-    env:
-      MLIR_SYS_170_PREFIX: /usr/lib/llvm-17
-      LLVM_SYS_170_PREFIX: /usr/lib/llvm-17
-      TABLEGEN_170_PREFIX: /usr/lib/llvm-17
+    #env:
+    #  MLIR_SYS_170_PREFIX: /usr/lib/llvm-17
+    #  LLVM_SYS_170_PREFIX: /usr/lib/llvm-17
+    #  TABLEGEN_170_PREFIX: /usr/lib/llvm-17
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
