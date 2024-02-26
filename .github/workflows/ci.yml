@@ -1,4 +1,4 @@
-name: ERC20 Native Tests
+name: CI
 
 on:
   push:
