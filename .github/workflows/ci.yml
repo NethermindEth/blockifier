@@ -59,12 +59,16 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Set up Native Dependencies
+        uses: ./.github/actions/setup-native-dep
       - run: scripts/clippy.sh
 
   run-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Set up Native Dependencies
+        uses: ./.github/actions/setup-native-dep
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -81,21 +85,8 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep
-        # - name: add llvm deb repository
-        #   uses: myci-actions/add-deb-repo@10
-        #   with:
-        #     repo: deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main
-        #     repo-name: llvm-repo
-        #     keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
-        # - name: Install LLVM
-        #   run: sudo apt-get install llvm-17 llvm-17-dev llvm-17-runtime clang-17 clang-tools-17 lld-17 libpolly-17-dev libmlir-17-dev mlir-17-tools
-        # - name: Install gmplib
-        #   run: sudo apt install -y libgmp3-dev
       - uses: actions/checkout@v3
         with:
           repository: 'lambdaclass/cairo_native'
@@ -122,6 +113,8 @@ jobs:
         id: "cache-cargo"
       - if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' }}
         name: "Download and run cargo-udeps"
+        - name: Set up Native Dependencies
+          uses: ./.github/actions/setup-native-dep
         run: |
           wget -O - -c https://github.com/est31/cargo-udeps/releases/download/v0.1.35/cargo-udeps-v0.1.35-x86_64-unknown-linux-gnu.tar.gz | tar -xz
           cargo-udeps-*/cargo-udeps udeps
