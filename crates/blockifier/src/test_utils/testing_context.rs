@@ -4,6 +4,7 @@ mod state_factory;
 mod string_utils;
 mod test_event;
 mod yas_erc20_factory;
+mod yas_factory;
 mod yas_faucet_factory;
 
 use std::collections::HashMap;
@@ -20,6 +21,7 @@ use starknet_types_core::felt::Felt;
 pub use state_factory::*;
 pub use test_event::*;
 pub use yas_erc20_factory::*;
+pub use yas_factory::*;
 pub use yas_faucet_factory::*;
 
 use crate::abi::abi_utils::selector_from_name;
@@ -63,7 +65,7 @@ pub struct TestContext {
 impl TestContext {
     pub fn new<T: StateFactory>(factory: T) -> Self {
         let mut state = create_custom_deploy_test_state(vec![], vec![]);
-        let contract_address = factory.create_state(&mut state);
+        let (contract_address, _retdata) = factory.create_state(&mut state);
         // get type name of factory
         Self {
             contract_addresses: HashMap::from([(T::name(), contract_address)]),
@@ -72,6 +74,22 @@ impl TestContext {
             events: vec![],
             block_context: BlockContext::create_for_testing(),
         }
+    }
+
+    pub fn new_with_callinfo<T: StateFactory>(factory: T) -> (Self, CallInfo) {
+        let mut state = create_custom_deploy_test_state(vec![], vec![]);
+        let (contract_address, call_info) = factory.create_state(&mut state);
+        // get type name of factory
+        (
+            Self {
+                contract_addresses: HashMap::from([(T::name(), contract_address)]),
+                state,
+                caller_address: Signers::Alice.into(),
+                events: call_info.execution.events.iter().map(|e| e.clone().into()).collect(),
+                block_context: BlockContext::create_for_testing(),
+            },
+            call_info,
+        )
     }
 
     pub fn with_caller(mut self, caller_address: ContractAddress) -> Self {
@@ -85,7 +103,7 @@ impl TestContext {
     }
 
     pub fn patch_with_factory<T: StateFactory>(&mut self, factory: T) {
-        let contract_address = factory.create_state(&mut self.state);
+        let (contract_address, _) = factory.create_state(&mut self.state);
 
         self.contract_addresses.insert(T::name(), contract_address);
     }
@@ -156,7 +174,7 @@ pub fn deploy_contract(
     class_hash: Felt,
     contract_address_salt: Felt,
     calldata: &[Felt],
-) -> SyscallResult<(Felt, Vec<Felt>)> {
+) -> SyscallResult<(Felt, CallInfo)> {
     let deployer_address: ContractAddress = Signers::Alice.into();
 
     let class_hash = ClassHash(felt_to_starkfelt(class_hash));
@@ -195,7 +213,6 @@ pub fn deploy_contract(
     )
     .map_err(|_| vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()])?;
 
-    let return_data = call_info.execution.retdata.0.into_iter().map(starkfelt_to_felt).collect();
     let contract_address_felt = starkfelt_to_felt(*calculated_contract_address.0.key());
-    Ok((contract_address_felt, return_data))
+    Ok((contract_address_felt, call_info))
 }

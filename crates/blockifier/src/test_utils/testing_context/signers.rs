@@ -10,6 +10,7 @@ pub enum Signers {
     Alice,
     Bob,
     Charlie,
+    Custom(ContractAddress),
 }
 
 impl Signers {
@@ -18,6 +19,7 @@ impl Signers {
             Signers::Alice => ContractAddress(patricia_key!(0x001u128)),
             Signers::Bob => ContractAddress(patricia_key!(0x002u128)),
             Signers::Charlie => ContractAddress(patricia_key!(0x003u128)),
+            Signers::Custom(address) => *address,
         }
     }
 }
@@ -38,4 +40,23 @@ impl Into<StarkFelt> for Signers {
     fn into(self) -> StarkFelt {
         felt_to_starkfelt(contract_address_to_felt(self.get_address()))
     }
+}
+
+#[allow(non_snake_case)]
+pub fn ZERO() -> Signers {
+    Signers::Custom(ContractAddress(patricia_key!(0x000u128)))
+}
+
+#[allow(non_snake_case)]
+pub fn OWNER() -> Signers {
+    Signers::Alice.into()
+}
+#[allow(non_snake_case)]
+pub fn WALLET() -> Signers {
+    Signers::Bob.into()
+}
+
+#[allow(non_snake_case)]
+pub fn OTHER() -> Signers {
+    Signers::Charlie.into()
 }

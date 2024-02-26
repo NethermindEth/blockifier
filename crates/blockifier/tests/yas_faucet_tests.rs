@@ -1,6 +1,6 @@
 use blockifier::execution::sierra_utils::{contract_address_to_felt, felt_to_starkfelt};
 use blockifier::test_utils::testing_context::{
-    Signers, StateFactory, TestContext, YASERC20Factory, YASFaucetFactory,
+    StateFactory, TestContext, YASERC20Factory, YASFaucetFactory, OTHER, OWNER, WALLET,
 };
 use starknet_api::hash::StarkFelt;
 use starknet_types_core::felt::Felt;
@@ -33,20 +33,6 @@ fn setup() -> TestContext {
     );
 
     context
-}
-
-#[allow(non_snake_case)]
-fn OWNER() -> Signers {
-    Signers::Alice.into()
-}
-#[allow(non_snake_case)]
-fn WALLET() -> Signers {
-    Signers::Bob.into()
-}
-
-#[allow(non_snake_case)]
-fn OTHER() -> Signers {
-    Signers::Charlie.into()
 }
 
 #[test]
