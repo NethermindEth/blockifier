@@ -98,6 +98,10 @@ impl TestContext {
         self
     }
 
+    pub fn set_caller(&mut self, caller_address: ContractAddress) {
+        self.caller_address = caller_address;
+    }
+
     pub fn contract_address(&self, contract_name: &str) -> ContractAddress {
         self.contract_addresses.get(contract_name).unwrap().clone()
     }
@@ -162,6 +166,10 @@ impl TestContext {
 
     pub fn get_event(&self, index: usize) -> Option<TestEvent> {
         self.events.get(index).cloned()
+    }
+
+    pub fn clean_events(&mut self) {
+        self.events.clear();
     }
 
     pub fn get_caller(&self) -> ContractAddress {

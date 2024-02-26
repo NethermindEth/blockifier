@@ -60,3 +60,13 @@ pub fn WALLET() -> Signers {
 pub fn OTHER() -> Signers {
     Signers::Charlie.into()
 }
+
+#[allow(non_snake_case)]
+pub fn TOKEN_A() -> Signers {
+    Signers::Custom(ContractAddress(patricia_key!(0x100000000000au128)))
+}
+
+#[allow(non_snake_case)]
+pub fn TOKEN_B() -> Signers {
+    Signers::Custom(ContractAddress(patricia_key!(0x100000000000bu128)))
+}

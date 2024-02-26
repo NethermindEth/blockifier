@@ -102,6 +102,8 @@ pub const YAS_FAUCET_CONTRACT_PATH: &str =
     "./feature_contracts/yet-another-swap/target/dev/yas_faucet_YASFaucet.sierra.json";
 pub const YAS_FACTORY_CONTRACT_PATH: &str =
     "./feature_contracts/yet-another-swap/target/dev/yas_core_YASFactory.contract_class.json";
+pub const YAS_POOL_CONTRACT_PATH: &str =
+    "./feature_contracts/yet-another-swap/target/dev/yas_core_YASPool.contract_class.json";
 
 #[derive(Clone, Copy, Debug)]
 pub enum CairoVersion {

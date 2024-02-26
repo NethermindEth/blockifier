@@ -1,9 +1,15 @@
 use blockifier::execution::call_info::CallInfo;
-use blockifier::test_utils::testing_context::{TestContext, YASFactory};
-use blockifier::test_utils::TEST_YAS_POOL_CONTRACT_CLASS_HASH;
+use blockifier::execution::contract_class::SierraContractClassV1;
+use blockifier::execution::sierra_utils::felt_to_starkfelt;
+use blockifier::test_utils::testing_context::{
+    StateFactory, TestContext, YASFactory, OTHER, OWNER, TOKEN_A, TOKEN_B, ZERO,
+};
+use blockifier::test_utils::{TEST_YAS_POOL_CONTRACT_CLASS_HASH, YAS_POOL_CONTRACT_PATH};
 use starknet_api::class_hash;
 use starknet_api::core::{ClassHash, ContractAddress};
-use starknet_api::hash::StarkHash;
+use starknet_api::hash::{StarkFelt, StarkHash};
+use starknet_types_core::felt::Felt;
+use test_case::test_case;
 
 // pool class hash can not be zero
 pub const POOL_CLASS_HASH_CAN_NOT_BE_ZERO: &str =
@@ -16,12 +22,17 @@ pub fn setup(
     let pool_class_hash =
         pool_class_hash.unwrap_or_else(|| class_hash!(TEST_YAS_POOL_CONTRACT_CLASS_HASH));
 
-    let (context, call_info) =
+    let (mut context, call_info) =
         TestContext::new_with_callinfo(YASFactory::new(deployer, pool_class_hash));
+
+    context.add_manual_class_hash(
+        pool_class_hash,
+        SierraContractClassV1::from_file(YAS_POOL_CONTRACT_PATH).into(),
+    );
 
     (context, call_info)
 }
-
+#[derive(Debug, Clone, Copy)]
 pub enum FeeAmount {
     Custom,
     Low,
@@ -51,11 +62,6 @@ impl FeeAmount {
 
 #[cfg(test)]
 mod constructor_tests {
-    use blockifier::execution::sierra_utils::felt_to_starkfelt;
-    use blockifier::test_utils::testing_context::{StateFactory, OWNER, ZERO};
-    use starknet_api::hash::StarkFelt;
-    use starknet_types_core::felt::Felt;
-
     use super::*;
 
     #[test]
@@ -168,4 +174,66 @@ mod constructor_tests {
             ]
         );
     }
+}
+
+#[test_case(
+    FeeAmount::Custom;
+    "fee_amount_custom"
+)]
+#[test_case(
+    FeeAmount::Low;
+    "fee_amount_low"
+)]
+#[test_case(
+    FeeAmount::Medium;
+    "fee_amount_medium"
+)]
+#[test_case(
+    FeeAmount::High;
+    "fee_amount_high"
+)]
+fn test_create_pool(fee_amount: FeeAmount) {
+    let (mut context, _) = setup(OWNER().into(), None);
+
+    context.clean_events();
+    context.set_caller(OTHER().into());
+
+    let pool_deployed = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(fee_amount.fee_amount())],
+    );
+
+    let pool_token_a_token_b = context.call_entry_point(
+        YASFactory::name(),
+        "pool",
+        vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(fee_amount.fee_amount())],
+    );
+
+    let pool_token_b_token_a = context.call_entry_point(
+        YASFactory::name(),
+        "pool",
+        vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(fee_amount.fee_amount())],
+    );
+
+    assert_eq!(pool_deployed, pool_token_a_token_b);
+    assert_eq!(pool_deployed, pool_token_b_token_a);
+
+    match fee_amount {
+        FeeAmount::Custom => {
+            panic!("Custom fee amount should not be enabled by default");
+        }
+        _ => (),
+    }
+
+    // Verify PoolCreated event emitted
+    let event = context.get_event(0).unwrap();
+    let pool_deployed = *pool_deployed.first().unwrap();
+
+    assert_eq!(event.data[0], TOKEN_A().into());
+    assert_eq!(event.data[1], TOKEN_B().into());
+    assert_eq!(event.data[2], Felt::from(fee_amount.fee_amount()));
+    assert_eq!(event.data[3], Felt::from(fee_amount.tick_spacing()));
+    assert_eq!(event.data[4], Felt::from(0u8));
+    assert_eq!(event.data[5], pool_deployed);
 }
