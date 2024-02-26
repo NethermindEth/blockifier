@@ -74,9 +74,8 @@ fn test_happy_path() {
     let result = context.call_entry_point(YASFaucetFactory::name(), "faucet_mint", vec![]);
 
     println!("{:?}", result.first().unwrap().to_hex_string());
-
     assert_eq!(result, vec![]);
-    // assert(yas_erc_20.balanceOf(WALLET()) == 1000, 'wrong balance');\
+
     assert_eq!(
         context.call_entry_point(YASERC20Factory::name(), "balanceOf", vec![WALLET().into()]),
         vec![Felt::from(1000), Felt::from(0)]
