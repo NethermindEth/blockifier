@@ -30,14 +30,16 @@ fn setup() -> TestContext {
     context
 }
 
+#[allow(non_snake_case)]
 fn OWNER() -> Signers {
     Signers::Alice.into()
 }
-
+#[allow(non_snake_case)]
 fn WALLET() -> Signers {
     Signers::Bob.into()
 }
 
+#[allow(non_snake_case)]
 fn OTHER() -> Signers {
     Signers::Charlie.into()
 }
