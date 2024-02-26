@@ -85,7 +85,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Set up Native Dependencies
-        uses: ./.github/actions/setup-native-dep.yml
+        uses: ./.github/actions/setup-native-dep
         # - name: add llvm deb repository
         #   uses: myci-actions/add-deb-repo@10
         #   with:
