@@ -12,6 +12,7 @@ use std::sync::Arc;
 use cairo_native::starknet::SyscallResult;
 pub use erc20_factory::*;
 pub use signers::*;
+use starknet_api::block::BlockTimestamp;
 use starknet_api::core::{calculate_contract_address, ClassHash, ContractAddress};
 use starknet_api::hash::StarkFelt;
 use starknet_api::transaction::{Calldata, ContractAddressSalt};
@@ -56,6 +57,7 @@ pub struct TestContext {
     pub state: CachedState<DictStateReader>,
     pub caller_address: ContractAddress,
     pub events: Vec<TestEvent>,
+    pub block_context: BlockContext,
 }
 
 impl TestContext {
@@ -68,11 +70,13 @@ impl TestContext {
             state,
             caller_address: Signers::Alice.into(),
             events: vec![],
+            block_context: BlockContext::create_for_testing(),
         }
     }
 
     pub fn with_caller(mut self, caller_address: ContractAddress) -> Self {
         self.caller_address = caller_address;
+
         self
     }
 
@@ -100,6 +104,14 @@ impl TestContext {
         result.execution.retdata.0.iter().map(|felt| starkfelt_to_felt(*felt)).collect()
     }
 
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.block_context.block_timestamp = BlockTimestamp(timestamp);
+    }
+
+    pub fn get_timestamp(&self) -> u64 {
+        self.block_context.block_timestamp.0
+    }
+
     pub fn call_entry_point_raw(
         &mut self,
         contract_name: &str,
@@ -119,7 +131,9 @@ impl TestContext {
             ..external_entry_point(Some(contract_address))
         };
 
-        let result = entry_point_call.execute_directly(&mut self.state).unwrap();
+        let result = entry_point_call
+            .execute_directly_given_block_context(&mut self.state, self.block_context.clone())
+            .unwrap();
 
         let events = result.execution.events.clone();
 

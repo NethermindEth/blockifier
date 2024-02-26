@@ -54,6 +54,22 @@ impl CallEntryPoint {
         self.execute(state, &mut ExecutionResources::default(), &mut context)
     }
 
+    pub fn execute_directly_given_block_context(
+        self,
+        state: &mut dyn State,
+        block_context: BlockContext,
+    ) -> EntryPointExecutionResult<CallInfo> {
+        // self.execute(state, &mut ExecutionResources::default(), &mut context)
+        let mut context = EntryPointExecutionContext::new_invoke(
+            &block_context,
+            &AccountTransactionContext::Deprecated(DeprecatedAccountTransactionContext::default()),
+            true,
+        )
+        .unwrap();
+
+        self.execute(state, &mut ExecutionResources::default(), &mut context)
+    }
+
     /// Executes the call directly in validate mode, without account context. Limits the number of
     /// steps by resource bounds.
     pub fn execute_directly_in_validate_mode(
