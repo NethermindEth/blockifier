@@ -1020,7 +1020,6 @@ mod upgradable_tests {
 
     use super::*;
 
-    // TODO: Fix this test, broke after updating to latest cairo-native
     #[test]
     fn test_upgrade_emits_event() {
         let owner = Signers::Alice;
