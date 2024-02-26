@@ -5,8 +5,12 @@ use std::sync::Arc;
 use cairo_felt::Felt252;
 use cairo_lang_casm;
 use cairo_lang_casm::hints::Hint;
+use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::casm_contract_class::{CasmContractClass, CasmContractEntryPoint};
 use cairo_lang_starknet_classes::NestedIntList;
+use cairo_lang_starknet_classes::contract_class::{
+    ContractClass as SierraContractClass, ContractEntryPoints as SierraContractEntryPoints,
+};
 use cairo_vm::serde::deserialize_program::{
     ApTracking, FlowTrackingData, HintParams, ReferenceManager,
 };
@@ -29,6 +33,9 @@ use crate::abi::constants::{self, CONSTRUCTOR_ENTRY_POINT_NAME};
 use crate::execution::entry_point::CallEntryPoint;
 use crate::execution::errors::{ContractClassError, PreExecutionError};
 use crate::execution::execution_utils::{felt_to_stark_felt, sn_api_to_cairo_vm_program};
+
+use super::sierra_utils::contract_entrypoint_to_entrypoint_selector;
+
 /// Represents a runnable Starknet contract class (meaning, the program is runnable by the VM).
 /// We wrap the actual class in an Arc to avoid cloning the program when cloning the class.
 // Note: when deserializing from a SN API class JSON string, the ABI field is ignored
@@ -40,6 +47,7 @@ pub type ContractClassResult<T> = Result<T, ContractClassError>;
 pub enum ContractClass {
     V0(ContractClassV0),
     V1(ContractClassV1),
+    V1Sierra(SierraContractClassV1),
 }
 
 impl ContractClass {
@@ -47,6 +55,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.constructor_selector(),
             ContractClass::V1(class) => class.constructor_selector(),
+            ContractClass::V1Sierra(class) => class.constructor_selector(),
         }
     }
 
@@ -54,6 +63,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.estimate_casm_hash_computation_resources(),
             ContractClass::V1(class) => class.estimate_casm_hash_computation_resources(),
+            ContractClass::V1Sierra(_) => todo!("sierra estimate casm hash computation resources"),
         }
     }
 
@@ -61,6 +71,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.bytecode_length(),
             ContractClass::V1(class) => class.bytecode_length(),
+            ContractClass::V1Sierra(_) => todo!("Sierra bytecode_length"),
         }
     }
 }
@@ -416,6 +427,8 @@ impl ClassInfo {
         let (contract_class_version, condition) = match contract_class {
             ContractClass::V0(_) => (0, sierra_program_length == 0),
             ContractClass::V1(_) => (1, sierra_program_length > 0),
+            ContractClass::V1Sierra(_) => todo!("Sierra contract class version and condition"),
+            
         };
 
         if condition {
@@ -427,4 +440,48 @@ impl ClassInfo {
             })
         }
     }
+}
+// TODO add default?
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SierraContractClassV1(pub Arc<SierraContractClassV1Inner>);
+impl Deref for SierraContractClassV1 {
+    type Target = SierraContractClassV1Inner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl SierraContractClassV1 {
+    fn constructor_selector(&self) -> Option<EntryPointSelector> {
+        let entrypoint = self.deref().entry_points_by_type.constructor.first()?;
+        Some(contract_entrypoint_to_entrypoint_selector(entrypoint))
+    }
+
+    pub fn try_from_json_string(
+        raw_contract_class: &str,
+    ) -> Result<SierraContractClassV1, ProgramError> {
+        let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
+        let contract_class: SierraContractClassV1 = sierra_contract_class.try_into()?;
+
+        Ok(contract_class)
+    }
+}
+
+impl TryFrom<SierraContractClass> for SierraContractClassV1 {
+    // TODO error type
+    type Error = ProgramError;
+
+    fn try_from(class: SierraContractClass) -> Result<Self, Self::Error> {
+        Ok(Self(Arc::new(SierraContractClassV1Inner {
+            sierra_program: class.extract_sierra_program().unwrap(),
+            entry_points_by_type: class.entry_points_by_type,
+        })))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SierraContractClassV1Inner {
+    pub sierra_program: SierraProgram,
+    pub entry_points_by_type: SierraContractEntryPoints,
 }

@@ -11,10 +11,14 @@ pub mod struct_impls;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use cairo_felt::Felt252;
+use cairo_native::starknet::SyscallResult;
 use num_traits::{One, Zero};
-use starknet_api::core::{ContractAddress, EntryPointSelector, Nonce, PatriciaKey};
+use starknet_api::core::{
+    calculate_contract_address, ClassHash, ContractAddress, EntryPointSelector, Nonce, PatriciaKey,
+};
 use starknet_api::deprecated_contract_class::{
     ContractClass as DeprecatedContractClass, EntryPointType,
 };
@@ -23,15 +27,33 @@ use starknet_api::state::StorageKey;
 use starknet_api::transaction::{
     Calldata, ContractAddressSalt, Resource, ResourceBounds, ResourceBoundsMapping,
 };
-use starknet_api::{calldata, contract_address, patricia_key, stark_felt};
+use starknet_api::{calldata, class_hash, contract_address, patricia_key, stark_felt};
+use starknet_types_core::felt::Felt;
 
 use crate::abi::abi_utils::{get_fee_token_var_address, selector_from_name};
+use crate::context::BlockContext;
+use crate::execution::call_info::{CallInfo, OrderedEvent};
+use crate::execution::common_hints::ExecutionMode;
 use crate::execution::contract_class::{ContractClass, ContractClassV0};
-use crate::execution::entry_point::{CallEntryPoint, CallType};
-use crate::execution::execution_utils::felt_to_stark_felt;
+use crate::execution::entry_point::{
+    CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
+};
+use crate::execution::execution_utils::{execute_deployment, felt_to_stark_felt}; //TODO rename to felt252_to_stark_felt
+use crate::execution::sierra_utils::{
+    contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt,
+};
+use crate::execution::syscalls::hint_processor::{
+    FAILED_TO_CALCULATE_CONTRACT_ADDRESS, FAILED_TO_EXECUTE_CALL,
+};
+use crate::state::cached_state::CachedState;
+use crate::state::state_api::State;
+use crate::test_utils::cached_state::get_erc20_class_hash_mapping;
 use crate::test_utils::contracts::FeatureContract;
+use crate::test_utils::dict_state_reader::DictStateReader;
 use crate::utils::const_max;
 use crate::versioned_constants::VersionedConstants;
+
+use self::deploy_account::deploy_account_tx;
 // TODO(Dori, 1/2/2024): Remove these constants once all tests use the `contracts` and
 //   `initial_test_state` modules for testing.
 // Addresses.
@@ -44,6 +66,7 @@ pub const TEST_FAULTY_ACCOUNT_CONTRACT_ADDRESS: &str = "0x102";
 pub const TEST_SEQUENCER_ADDRESS: &str = "0x1000";
 pub const TEST_ERC20_CONTRACT_ADDRESS: &str = "0x1001";
 pub const TEST_ERC20_CONTRACT_ADDRESS2: &str = "0x1002";
+pub const TEST_ERC20_FULL_CONTRACT_ADDRESS: &str = "0x1003";
 
 // Class hashes.
 pub const TEST_CLASS_HASH: &str = "0x110";
@@ -58,6 +81,8 @@ pub const LEGACY_TEST_CLASS_HASH: &str = "0x117";
 // starkgate once we use the real ERC20 contract.
 pub const TEST_ERC20_CONTRACT_CLASS_HASH: &str = "0x1010";
 
+pub const TEST_ERC20_FULL_CONTRACT_CLASS_HASH: &str = "0x1011";
+
 // Paths.
 pub const ACCOUNT_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/account_with_dummy_validate.casm.json";
@@ -71,6 +96,8 @@ pub const TEST_CONTRACT_CAIRO0_PATH: &str =
     "./feature_contracts/cairo0/compiled/test_contract_compiled.json";
 pub const TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/test_contract.casm.json";
+pub const TEST_CONTRACT_SIERRA_PATH: &str =
+    "./feature_contracts/cairo1/compiled/sierra_test_contract.sierra.json";
 pub const LEGACY_TEST_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/legacy_test_contract.casm.json";
 pub const SECURITY_TEST_CONTRACT_CAIRO0_PATH: &str =
@@ -83,6 +110,8 @@ pub const TEST_FAULTY_ACCOUNT_CONTRACT_CAIRO0_PATH: &str =
     "./feature_contracts/cairo0/compiled/account_faulty_compiled.json";
 pub const ERC20_CONTRACT_PATH: &str =
     "./ERC20_without_some_syscalls/ERC20/erc20_contract_without_some_syscalls_compiled.json";
+pub const ERC20_FULL_CONTRACT_PATH: &str =
+    "./oz_erc20/target/dev/oz_erc20_OZ_ERC20.contract_class.json";
 
 #[derive(Clone, Copy, Debug)]
 pub enum CairoVersion {
@@ -222,6 +251,10 @@ pub fn trivial_external_entry_point_with_address(
         call_type: CallType::Call,
         initial_gas: VersionedConstants::create_for_testing().gas_cost("initial_gas_cost"),
     }
+}
+
+pub fn erc20_external_entry_point() -> CallEntryPoint {
+    trivial_external_entry_point_with_address(contract_address!(TEST_ERC20_FULL_CONTRACT_ADDRESS))
 }
 
 fn default_testing_resource_bounds() -> ResourceBoundsMapping {
@@ -387,4 +420,202 @@ pub fn create_trivial_calldata(test_contract_address: ContractAddress) -> Callda
         "return_result",
         &[stark_felt!(2_u8)], // Calldata: num.
     )
+}
+
+pub fn create_erc20_deploy_test_state() -> CachedState<DictStateReader> {
+    let address_to_class_hash: HashMap<ContractAddress, ClassHash> = HashMap::from([(
+        contract_address!(TEST_ERC20_FULL_CONTRACT_ADDRESS),
+        class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
+    )]);
+
+    CachedState::from(DictStateReader {
+        address_to_class_hash,
+        class_hash_to_class: get_erc20_class_hash_mapping(),
+        ..Default::default()
+    })
+}
+
+pub fn deploy_contract(
+    state: &mut dyn State,
+    class_hash: Felt,
+    contract_address_salt: Felt,
+    calldata: &[Felt],
+) -> SyscallResult<(Felt, Vec<Felt>)> {
+    let block_context = &BlockContext::create_for_account_testing();
+    let deployer_address = ContractAddress::default();
+
+    let class_hash = ClassHash(felt_to_starkfelt(class_hash));
+
+    let wrapper_calldata = Calldata(Arc::new(
+        calldata.iter().map(|felt| felt_to_starkfelt(*felt)).collect(),
+    ));
+
+    let calculated_contract_address = calculate_contract_address(
+        ContractAddressSalt(felt_to_starkfelt(contract_address_salt)),
+        class_hash,
+        &wrapper_calldata,
+        deployer_address,
+    )
+    .map_err(|_| vec![Felt::from_hex(FAILED_TO_CALCULATE_CONTRACT_ADDRESS).unwrap()])?;
+
+    let ctor_context = ConstructorContext {
+        class_hash,
+        code_address: Some(calculated_contract_address),
+        storage_address: calculated_contract_address,
+        caller_address: deployer_address,
+    };
+
+    let call_info = execute_deployment(
+        state,
+        &mut Default::default(),
+        &mut EntryPointExecutionContext::new(
+            // &AccountTransactionContext::Current(Default::default()),
+            Arc::new(block_context.to_tx_context(&deploy_account_tx(deploy_tx_args, nonce_manager)))
+            ExecutionMode::Execute,
+            false,
+        )
+        .unwrap(),
+        ctor_context,
+        wrapper_calldata,
+        u64::MAX,
+    )
+    .map_err(|_| vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()])?;
+
+    let return_data = call_info.execution.retdata.0.into_iter().map(starkfelt_to_felt).collect();
+    let contract_address_felt = starkfelt_to_felt(*calculated_contract_address.0.key());
+    Ok((contract_address_felt, return_data))
+}
+
+pub fn prepare_erc20_deploy_test_state() -> (ContractAddress, CachedState<DictStateReader>) {
+    let mut state = create_erc20_deploy_test_state();
+
+    let class_hash = Felt::from_hex(TEST_ERC20_FULL_CONTRACT_CLASS_HASH).unwrap();
+
+    let (contract_address, _) = deploy_contract(
+        &mut state,
+        class_hash,
+        Felt::from(0),
+        &[
+            contract_address_to_felt(Signers::Alice.into()), // Recipient
+            contract_address_to_felt(Signers::Alice.into()), // Owner
+        ],
+    )
+    .unwrap();
+
+    let contract_address = ContractAddress(
+        PatriciaKey::try_from(felt_to_starkfelt(contract_address)).unwrap(),
+    );
+
+    (contract_address, state)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Signers {
+    Alice,
+    Bob,
+    Charlie,
+}
+
+impl Signers {
+    pub fn get_address(&self) -> ContractAddress {
+        match self {
+            Signers::Alice => ContractAddress(patricia_key!(0x001u128)),
+            Signers::Bob => ContractAddress(patricia_key!(0x002u128)),
+            Signers::Charlie => ContractAddress(patricia_key!(0x003u128)),
+        }
+    }
+}
+
+impl Into<ContractAddress> for Signers {
+    fn into(self) -> ContractAddress {
+        self.get_address()
+    }
+}
+
+impl Into<Felt> for Signers {
+    fn into(self) -> Felt {
+        contract_address_to_felt(self.get_address())
+    }
+}
+
+impl Into<StarkFelt> for Signers {
+    fn into(self) -> StarkFelt {
+        felt_to_starkfelt(contract_address_to_felt(self.get_address()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TestEvent {
+    pub data: Vec<Felt>,
+    pub keys: Vec<Felt>,
+}
+
+impl From<OrderedEvent> for TestEvent {
+    fn from(value: OrderedEvent) -> Self {
+        let event_data = value.event.data.0.iter().map(|e| starkfelt_to_felt(*e)).collect();
+        let event_keys = value.event.keys.iter().map(|e| starkfelt_to_felt(e.0)).collect();
+        Self { data: event_data, keys: event_keys }
+    }
+}
+
+pub struct TestContext {
+    pub contract_address: ContractAddress,
+    pub state: CachedState<DictStateReader>,
+    pub caller_address: ContractAddress,
+    pub events: Vec<TestEvent>,
+}
+
+impl TestContext {
+    pub fn new() -> Self {
+        let (contract_address, state) = prepare_erc20_deploy_test_state();
+        Self { contract_address, state, caller_address: contract_address, events: vec![] }
+    }
+
+    pub fn with_caller(mut self, caller_address: ContractAddress) -> Self {
+        self.caller_address = caller_address;
+        self
+    }
+
+    pub fn call_entry_point(
+        &mut self,
+        entry_point_name: &str,
+        calldata: Vec<StarkFelt>,
+    ) -> Vec<Felt> {
+        let result = self.call_entry_point_raw(entry_point_name, calldata);
+        result.execution.retdata.0.iter().map(|felt| starkfelt_to_felt(*felt)).collect()
+    }
+
+    pub fn call_entry_point_raw(
+        &mut self,
+        entry_point_name: &str,
+        calldata: Vec<StarkFelt>,
+    ) -> CallInfo {
+        let entry_point_selector = selector_from_name(entry_point_name);
+        let calldata = Calldata(Arc::new(calldata));
+
+        let entry_point_call = CallEntryPoint {
+            calldata,
+            entry_point_selector,
+            code_address: Some(self.contract_address),
+            storage_address: self.contract_address,
+            caller_address: self.caller_address,
+            ..erc20_external_entry_point()
+        };
+
+        let result = entry_point_call.execute_directly(&mut self.state).unwrap();
+
+        let events = result.execution.events.clone();
+
+        self.events.extend(events.iter().map(|e| e.clone().into()));
+
+        result
+    }
+
+    pub fn get_event(&self, index: usize) -> Option<TestEvent> {
+        self.events.get(index).cloned()
+    }
+
+    pub fn get_caller(&self) -> ContractAddress {
+        self.caller_address
+    }
 }
