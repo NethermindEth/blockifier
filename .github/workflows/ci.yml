@@ -81,7 +81,9 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/checkout@v3
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep.yml
         # - name: add llvm deb repository
