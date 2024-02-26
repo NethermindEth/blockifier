@@ -193,13 +193,6 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             entry_point_selector: starkfelt_to_felt(self.entry_point_selector),
         };
 
-        println!("Returned ExecutionInfo from syscall: {:?}", result);
-
-        println!(
-            "Returned Account Contract address from ExecutionInfoV2 syscall : {:?}",
-            result.tx_info.account_contract_address.to_string()
-        );
-
         Ok(result)
     }
 

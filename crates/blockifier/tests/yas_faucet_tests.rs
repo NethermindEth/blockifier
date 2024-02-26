@@ -1,30 +1,82 @@
-// use blockifier::test_utils::TestContext;
-// use starknet_api::core::ContractAddress;
-//
-// #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// pub struct YasTokenContract {
-//     pub contract_address: ContractAddress,
-// }
-//
-// impl YasTokenContract {
-//     pub fn new(_context: &mut TestContext) -> Self {
-//         Self::default()
-//     }
-// }
-//
-// pub struct YasFaucetContract {
-//     pub contract_address: ContractAddress,
-// }
-//
-// impl YasFaucetContract {
-//     pub fn new(_context: &mut TestContext) -> Self {
-//         Self { contract_address: ContractAddress::from([1; 32]) }
-//     }
-// }
-//
-// pub fn setup_faucet_test_env() -> (YasTokenContract, YasFaucetContract) {
-//     let context = TestContext::new();
-//     let token_contract = YasTokenContract::new(ContractAddress::from([0; 32]));
-//     let faucet_contract = YasFaucetContract::new(ContractAddress::from([1; 32]));
-//     (token_contract, faucet_contract)
-// }
+use blockifier::execution::sierra_utils::{contract_address_to_felt, felt_to_starkfelt};
+use blockifier::test_utils::testing_context::{
+    Signers, StateFactory, TestContext, YASERC20Factory, YASFaucetFactory,
+};
+use starknet_api::hash::StarkFelt;
+use starknet_types_core::felt::Felt;
+
+fn setup() -> TestContext {
+    let mut context = TestContext::new(YASERC20Factory::new()).with_caller(OWNER().into());
+
+    context.patch_with_factory(YASFaucetFactory::new(
+        context.contract_address(YASERC20Factory::name()),
+    ));
+
+    assert_eq!(
+        context.call_entry_point(
+            YASERC20Factory::name(),
+            "transfer",
+            vec![
+                felt_to_starkfelt(contract_address_to_felt(
+                    context.contract_address(YASFaucetFactory::name()),
+                )),
+                StarkFelt::from(4000000000000000000u128),
+                StarkFelt::from(0u128),
+            ],
+        ),
+        vec![Felt::from(true)]
+    );
+
+    context
+}
+
+fn OWNER() -> Signers {
+    Signers::Alice.into()
+}
+
+fn WALLET() -> Signers {
+    Signers::Bob.into()
+}
+
+fn OTHER() -> Signers {
+    Signers::Charlie.into()
+}
+
+#[test]
+fn deploys_yas_faucet() {
+    let _ = setup();
+}
+
+#[test]
+fn test_happy_path() {
+    let mut context = setup();
+
+    // assert(yas_erc_20.balanceOf(WALLET()) == 0, 'wrong balance');
+    assert_eq!(
+        context.call_entry_point(YASERC20Factory::name(), "balanceOf", vec![WALLET().into()]),
+        vec![Felt::from(0), Felt::from(0)]
+    );
+
+    context = context.with_caller(WALLET().into());
+
+    let result = context.call_entry_point(
+        YASERC20Factory::name(),
+        "balanceOf",
+        vec![felt_to_starkfelt(contract_address_to_felt(
+            context.contract_address(YASFaucetFactory::name()),
+        ))],
+    );
+
+    println!("{:?}", result.first().unwrap().to_hex_string());
+
+    let result = context.call_entry_point(YASFaucetFactory::name(), "faucet_mint", vec![]);
+
+    println!("{:?}", result.first().unwrap().to_hex_string());
+
+    assert_eq!(result, vec![]);
+    // assert(yas_erc_20.balanceOf(WALLET()) == 1000, 'wrong balance');\
+    assert_eq!(
+        context.call_entry_point(YASERC20Factory::name(), "balanceOf", vec![WALLET().into()]),
+        vec![Felt::from(1000), Felt::from(0)]
+    );
+}

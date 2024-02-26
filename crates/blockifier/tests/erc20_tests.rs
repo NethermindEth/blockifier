@@ -21,7 +21,7 @@ pub const DECIMALS: u128 = 18;
 
 #[test]
 fn should_deploy() {
-    let (_contract_address, _state) = prepare_erc20_deploy_test_state();
+    TestContext::new(ERC20Factory::new());
 }
 
 #[cfg(test)]
@@ -57,7 +57,7 @@ mod read_only_methods_tests {
     fn test_total_supply() {
         let mut context = TestContext::new(ERC20Factory::new());
 
-        let result = context.call_entry_point("total_supply", vec![]);
+        let result = context.call_entry_point(ERC20Factory::name(), "total_supply", vec![]);
 
         assert_eq!(result, vec![Felt::from(TOTAL_SUPPLY), Felt::from(0u8)]);
     }
@@ -67,7 +67,7 @@ mod read_only_methods_tests {
         let address = felt_to_starkfelt(contract_address_to_felt(Signers::Alice.into()));
 
         let mut context = TestContext::new(ERC20Factory::new());
-        let result = context.call_entry_point("balance_of", vec![address]);
+        let result = context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address]);
 
         assert_eq!(result, vec![Felt::from(TOTAL_SUPPLY), Felt::from(0u8)]);
     }
@@ -88,17 +88,18 @@ mod transfer_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -106,12 +107,12 @@ mod transfer_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
@@ -127,17 +128,18 @@ mod transfer_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -145,12 +147,12 @@ mod transfer_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
     }
@@ -167,17 +169,18 @@ mod transfer_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -185,12 +188,12 @@ mod transfer_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
 
@@ -218,12 +221,17 @@ mod allowance_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -231,7 +239,11 @@ mod allowance_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
@@ -246,12 +258,17 @@ mod allowance_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "increase_allowance",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -259,7 +276,11 @@ mod allowance_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
@@ -274,12 +295,17 @@ mod allowance_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -287,12 +313,17 @@ mod allowance_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "decrease_allowance",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -300,7 +331,11 @@ mod allowance_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
     }
@@ -315,12 +350,17 @@ mod allowance_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_to.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -328,7 +368,11 @@ mod allowance_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "allowance",
+                vec![address_from.into(), address_to.into()]
+            ),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
 
@@ -359,17 +403,18 @@ mod transfer_from_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_spender.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -380,6 +425,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer_from",
                 vec![
                     address_from.into(),
@@ -392,12 +438,12 @@ mod transfer_from_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![starkfelt_to_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
@@ -414,17 +460,18 @@ mod transfer_from_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_spender.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -435,6 +482,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer_from",
                 vec![
                     address_from.into(),
@@ -447,12 +495,12 @@ mod transfer_from_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
     }
@@ -469,17 +517,18 @@ mod transfer_from_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_spender.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -490,6 +539,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer_from",
                 vec![
                     address_from.into(),
@@ -502,12 +552,12 @@ mod transfer_from_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
     }
@@ -524,17 +574,18 @@ mod transfer_from_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(address_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_from.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_from.into()]),
             vec![starkfelt_to_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to.into()]),
+            context.call_entry_point(ERC20Factory::name(), "balance_of", vec![address_to.into()]),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "approve",
                 vec![address_spender.into(), balance_to_transfer, StarkFelt::from(0u128)],
             ),
@@ -554,6 +605,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "transfer_from",
                 vec![
                     address_from.into(),
@@ -583,7 +635,7 @@ mod metadata_tests {
     #[test]
     fn test_name() {
         let mut context = TestContext::new(ERC20Factory::new());
-        let result = context.call_entry_point("name", vec![]);
+        let result = context.call_entry_point(ERC20Factory::name(), "name", vec![]);
 
         assert_eq!(result, vec![Felt::from_bytes_be_slice(NAME.as_bytes())]);
     }
@@ -591,7 +643,7 @@ mod metadata_tests {
     #[test]
     fn test_symbol() {
         let mut context = TestContext::new(ERC20Factory::new());
-        let result = context.call_entry_point("symbol", vec![]);
+        let result = context.call_entry_point(ERC20Factory::name(), "symbol", vec![]);
 
         assert_eq!(result, vec![Felt::from_bytes_be_slice(SYMBOL.as_bytes())]);
     }
@@ -599,7 +651,7 @@ mod metadata_tests {
     #[test]
     fn test_decimals() {
         let mut context = TestContext::new(ERC20Factory::new());
-        let result = context.call_entry_point("decimals", vec![]);
+        let result = context.call_entry_point(ERC20Factory::name(), "decimals", vec![]);
 
         assert_eq!(result, vec![Felt::from(DECIMALS)]);
     }
@@ -616,12 +668,17 @@ pub mod mintable_tests {
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(Signers::Alice.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_mint_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_mint_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "mint",
                 vec![
                     address_to_mint_to.into(),
@@ -633,12 +690,16 @@ pub mod mintable_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_mint_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_mint_to.into()]
+            ),
             vec![Felt::from(BALANCE_TO_TRANSFER), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("total_supply", vec![]),
+            context.call_entry_point(ERC20Factory::name(), "total_supply", vec![]),
             vec![Felt::from(TOTAL_SUPPLY + BALANCE_TO_TRANSFER), Felt::from(0u128)]
         );
     }
@@ -652,12 +713,17 @@ pub mod mintable_tests {
             TestContext::new(ERC20Factory::new()).with_caller(address_of_minter.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_mint_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_mint_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "mint",
                 vec![
                     address_to_mint_to.into(),
@@ -669,12 +735,16 @@ pub mod mintable_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_mint_to.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_mint_to.into()]
+            ),
             vec![Felt::from(0u128), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("total_supply", vec![]),
+            context.call_entry_point(ERC20Factory::name(), "total_supply", vec![]),
             vec![Felt::from(TOTAL_SUPPLY), Felt::from(0u128)]
         );
     }
@@ -688,6 +758,7 @@ pub mod mintable_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "mint",
                 vec![
                     address_to_mint_to.into(),
@@ -725,12 +796,17 @@ pub mod burnable_tests {
             TestContext::new(ERC20Factory::new()).with_caller(address_to_burn_from.into());
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_burn_from.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_burn_from.into()]
+            ),
             vec![Felt::from(TOTAL_SUPPLY), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "burn",
                 vec![StarkFelt::from(BALANCE_TO_TRANSFER), StarkFelt::from(0u128)],
             ),
@@ -738,12 +814,16 @@ pub mod burnable_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("balance_of", vec![address_to_burn_from.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "balance_of",
+                vec![address_to_burn_from.into()]
+            ),
             vec![Felt::from(TOTAL_SUPPLY - BALANCE_TO_TRANSFER), Felt::from(0u128)]
         );
 
         assert_eq!(
-            context.call_entry_point("total_supply", vec![]),
+            context.call_entry_point(ERC20Factory::name(), "total_supply", vec![]),
             vec![Felt::from(TOTAL_SUPPLY - BALANCE_TO_TRANSFER), Felt::from(0u128)]
         );
     }
@@ -754,6 +834,7 @@ pub mod burnable_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "burn",
                 vec![StarkFelt::from(TOTAL_SUPPLY + 1), StarkFelt::from(0u128)]
             ),
@@ -761,7 +842,7 @@ pub mod burnable_tests {
         );
 
         assert_eq!(
-            context.call_entry_point("total_supply", vec![]),
+            context.call_entry_point(ERC20Factory::name(), "total_supply", vec![]),
             vec![Felt::from(TOTAL_SUPPLY), Felt::from(0u128)]
         );
     }
@@ -775,6 +856,7 @@ pub mod burnable_tests {
 
         assert_eq!(
             context.call_entry_point(
+                ERC20Factory::name(),
                 "burn",
                 vec![StarkFelt::from(BALANCE_TO_TRANSFER), StarkFelt::from(0u128)],
             ),
@@ -807,11 +889,24 @@ pub mod ownable_tests {
 
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(Signers::Alice.into());
 
-        assert_eq!(context.call_entry_point("owner", vec![]), vec![current_owner.into()]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "owner", vec![]),
+            vec![current_owner.into()]
+        );
 
-        assert_eq!(context.call_entry_point("transfer_ownership", vec![new_owner.into()]), vec![]);
+        assert_eq!(
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "transfer_ownership",
+                vec![new_owner.into()]
+            ),
+            vec![]
+        );
 
-        assert_eq!(context.call_entry_point("owner", vec![]), vec![new_owner.into()]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "owner", vec![]),
+            vec![new_owner.into()]
+        );
     }
 
     #[test]
@@ -822,14 +917,24 @@ pub mod ownable_tests {
         let mut context =
             TestContext::new(ERC20Factory::new()).with_caller(Signers::Charlie.into());
 
-        assert_eq!(context.call_entry_point("owner", vec![]), vec![current_owner.into()]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "owner", vec![]),
+            vec![current_owner.into()]
+        );
 
         assert_eq!(
-            context.call_entry_point("transfer_ownership", vec![new_owner.into()]),
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "transfer_ownership",
+                vec![new_owner.into()]
+            ),
             vec![Felt::from_hex(CALLER_IS_NOT_THE_OWNER).unwrap()]
         );
 
-        assert_eq!(context.call_entry_point("owner", vec![]), vec![current_owner.into()]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "owner", vec![]),
+            vec![current_owner.into()]
+        );
     }
 
     #[test]
@@ -839,7 +944,14 @@ pub mod ownable_tests {
 
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(current_owner.into());
 
-        assert_eq!(context.call_entry_point("transfer_ownership", vec![new_owner.into()]), vec![]);
+        assert_eq!(
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "transfer_ownership",
+                vec![new_owner.into()]
+            ),
+            vec![]
+        );
 
         let event = context.get_event(0).unwrap();
 
@@ -859,13 +971,19 @@ mod pausable_tests {
 
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
-        assert_eq!(context.call_entry_point("is_paused", vec![]), vec![Felt::from(false)]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "is_paused", vec![]),
+            vec![Felt::from(false)]
+        );
 
-        assert_eq!(context.call_entry_point("pause", vec![]), vec![]);
+        assert_eq!(context.call_entry_point(ERC20Factory::name(), "pause", vec![]), vec![]);
 
-        assert_eq!(context.call_entry_point("is_paused", vec![]), vec![Felt::from(true)]);
+        assert_eq!(
+            context.call_entry_point(ERC20Factory::name(), "is_paused", vec![]),
+            vec![Felt::from(true)]
+        );
 
-        assert_eq!(context.call_entry_point("unpause", vec![]), vec![]);
+        assert_eq!(context.call_entry_point(ERC20Factory::name(), "unpause", vec![]), vec![]);
     }
 
     #[test]
@@ -874,7 +992,7 @@ mod pausable_tests {
 
         let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
-        assert_eq!(context.call_entry_point("pause", vec![]), vec![]);
+        assert_eq!(context.call_entry_point(ERC20Factory::name(), "pause", vec![]), vec![]);
 
         let event = context.get_event(0).unwrap();
 
@@ -882,7 +1000,7 @@ mod pausable_tests {
 
         assert_eq!(event, owner.into());
 
-        assert_eq!(context.call_entry_point("unpause", vec![]), vec![]);
+        assert_eq!(context.call_entry_point(ERC20Factory::name(), "unpause", vec![]), vec![]);
 
         let event = context.get_event(1).unwrap();
 
@@ -909,16 +1027,18 @@ mod upgradable_tests {
 
         let code_hash = Felt::from_hex(TEST_EMPTY_CONTRACT_CLASS_HASH).unwrap();
 
-        let mut context = TestContext::new(ERC20Factory::new_with_test_state_args(
-            vec![],
-            vec![(
-                class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
-                ContractClassV1::from_file(TEST_EMPTY_CONTRACT_CAIRO1_PATH).into(),
-            )],
-        ))
-        .with_caller(owner.into());
+        let mut context = TestContext::new(ERC20Factory::new()).with_caller(owner.into());
 
-        let result = context.call_entry_point("upgrade", vec![felt_to_starkfelt(code_hash)]);
+        context.add_manual_class_hash(
+            class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
+            ContractClassV1::from_file(TEST_EMPTY_CONTRACT_CAIRO1_PATH).into(),
+        );
+
+        let result = context.call_entry_point(
+            ERC20Factory::name(),
+            "upgrade",
+            vec![felt_to_starkfelt(code_hash)],
+        );
 
         println!("{:?}", result.first().unwrap().to_hex_string());
         assert_eq!(result, vec![]);

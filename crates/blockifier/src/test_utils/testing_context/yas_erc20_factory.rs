@@ -1,42 +1,39 @@
-use starknet_api::class_hash;
-use starknet_api::core::ClassHash;
-use starknet_api::hash::StarkHash;
 use starknet_types_core::felt::Felt;
 
-use crate::execution::contract_class::SierraContractClassV1;
-use crate::state::cached_state::CachedState;
-use crate::test_utils::dict_state_reader::DictStateReader;
-use crate::test_utils::testing_context::{create_custom_deploy_test_state, StateFactory};
-use crate::test_utils::{ERC20_FULL_CONTRACT_PATH, TEST_ERC20_FULL_CONTRACT_CLASS_HASH};
+use crate::execution::contract_class::{ContractClass, SierraContractClassV1};
+use crate::test_utils::testing_context::string_utils::string_to_felt;
+use crate::test_utils::testing_context::{Signers, StateFactory};
+use crate::test_utils::{TEST_YAS_ERC20_CONTRACT_CLASS_HASH, YAS_ERC20_CONTRACT_PATH};
 
-pub struct YASERC20Factory {
-    args: Vec<Felt>,
-    #[allow(dead_code)]
-    state: CachedState<DictStateReader>,
-}
+pub struct YASERC20Factory {}
 
-impl YASERC20Factory {
-    pub fn new(args: Vec<Felt>) -> Self {
-        YASERC20Factory { args, state: create_custom_deploy_test_state(vec![], vec![]) }
+impl<'a> YASERC20Factory {
+    pub fn new() -> Self {
+        YASERC20Factory {}
     }
 }
 
 impl StateFactory for YASERC20Factory {
-    fn get_state(&self) -> CachedState<DictStateReader> {
-        create_custom_deploy_test_state(
-            vec![],
-            vec![(
-                class_hash!(TEST_ERC20_FULL_CONTRACT_CLASS_HASH),
-                SierraContractClassV1::from_file(ERC20_FULL_CONTRACT_PATH).into(),
-            )],
-        )
-    }
-
     fn args(&self) -> Vec<Felt> {
-        self.args.clone()
+        // 'YAS', '$YAS', 4000000000000000000, OWNER()
+        vec![
+            string_to_felt("YAS").unwrap(),
+            string_to_felt("$YAS").unwrap(),
+            Felt::from(4000000000000000000u128),
+            Felt::from(0),
+            Signers::Alice.into(),
+        ]
     }
 
     fn class_hash(&self) -> &'static str {
-        todo!()
+        TEST_YAS_ERC20_CONTRACT_CLASS_HASH
+    }
+
+    fn contract_class(&self) -> ContractClass {
+        SierraContractClassV1::from_file(YAS_ERC20_CONTRACT_PATH).into()
+    }
+
+    fn name() -> &'static str {
+        "YASERC20Factory"
     }
 }

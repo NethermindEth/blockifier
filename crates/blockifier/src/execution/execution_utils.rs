@@ -76,7 +76,6 @@ pub fn execute_entry_point_call(
             )
         }
         ContractClass::V1Sierra(contract_class) => {
-            println!("Executing in Cairo-Native");
             native_entry_point_execution::execute_entry_point_call(
                 call,
                 contract_class,

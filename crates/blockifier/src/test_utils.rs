@@ -61,6 +61,8 @@ pub const LEGACY_TEST_CLASS_HASH: &str = "0x117";
 pub const TEST_ERC20_CONTRACT_CLASS_HASH: &str = "0x1010";
 
 pub const TEST_ERC20_FULL_CONTRACT_CLASS_HASH: &str = "0x1011";
+pub const TEST_YAS_ERC20_CONTRACT_CLASS_HASH: &str = "0x1012";
+pub const TEST_YAS_FAUCET_CONTRACT_CLASS_HASH: &str = "0x1013";
 
 // Paths.
 pub const ACCOUNT_CONTRACT_CAIRO1_PATH: &str =
@@ -94,6 +96,8 @@ pub const ERC20_FULL_CONTRACT_PATH: &str =
     "./oz_erc20/target/dev/oz_erc20_OZ_ERC20.contract_class.json";
 pub const YAS_ERC20_CONTRACT_PATH: &str =
     "./feature_contracts/yet-another-swap/target/dev/yas_core_ERC20.contract_class.json";
+pub const YAS_FAUCET_CONTRACT_PATH: &str =
+    "./feature_contracts/yet-another-swap/target/dev/yas_faucet_YASFaucet.sierra.json";
 
 #[derive(Clone, Copy, Debug)]
 pub enum CairoVersion {
