@@ -1034,14 +1034,14 @@ mod upgradable_tests {
             ContractClassV1::from_file(TEST_EMPTY_CONTRACT_CAIRO1_PATH).into(),
         );
 
-        let result = context.call_entry_point(
-            ERC20Factory::name(),
-            "upgrade",
-            vec![felt_to_starkfelt(code_hash)],
+        assert_eq!(
+            context.call_entry_point(
+                ERC20Factory::name(),
+                "upgrade",
+                vec![felt_to_starkfelt(code_hash)],
+            ),
+            vec![]
         );
-
-        println!("{:?}", result.first().unwrap().to_hex_string());
-        assert_eq!(result, vec![]);
 
         let event = context.get_event(0).unwrap();
 
