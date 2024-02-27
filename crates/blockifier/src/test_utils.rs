@@ -31,7 +31,7 @@ use starknet_api::{calldata, class_hash, contract_address, patricia_key, stark_f
 use starknet_types_core::felt::Felt;
 
 use crate::abi::abi_utils::{get_fee_token_var_address, selector_from_name};
-use crate::context::BlockContext;
+use crate::context::{BlockContext, TransactionContext};
 use crate::execution::call_info::{CallInfo, OrderedEvent};
 use crate::execution::common_hints::ExecutionMode;
 use crate::execution::contract_class::{ContractClass, ContractClassV0};
@@ -50,10 +50,10 @@ use crate::state::state_api::State;
 use crate::test_utils::cached_state::get_erc20_class_hash_mapping;
 use crate::test_utils::contracts::FeatureContract;
 use crate::test_utils::dict_state_reader::DictStateReader;
+use crate::transaction::objects::TransactionInfo;
 use crate::utils::const_max;
 use crate::versioned_constants::VersionedConstants;
 
-use self::deploy_account::deploy_account_tx;
 // TODO(Dori, 1/2/2024): Remove these constants once all tests use the `contracts` and
 //   `initial_test_state` modules for testing.
 // Addresses.
@@ -441,7 +441,6 @@ pub fn deploy_contract(
     contract_address_salt: Felt,
     calldata: &[Felt],
 ) -> SyscallResult<(Felt, Vec<Felt>)> {
-    let block_context = &BlockContext::create_for_account_testing();
     let deployer_address = ContractAddress::default();
 
     let class_hash = ClassHash(felt_to_starkfelt(class_hash));
@@ -468,8 +467,10 @@ pub fn deploy_contract(
         state,
         &mut Default::default(),
         &mut EntryPointExecutionContext::new(
-            // &AccountTransactionContext::Current(Default::default()),
-            Arc::new(block_context.to_tx_context(&deploy_account_tx(deploy_tx_args, nonce_manager)))
+            Arc::new(TransactionContext {
+                block_context: BlockContext::create_for_testing(),
+                tx_info: TransactionInfo::Current(Default::default()),
+            }),
             ExecutionMode::Execute,
             false,
         )
