@@ -56,7 +56,7 @@ pub fn create_custom_deploy_test_state(
 }
 
 pub struct TestContext {
-    pub contract_addresses: HashMap<&'static str, ContractAddress>,
+    pub contract_addresses: HashMap<String, ContractAddress>,
     pub state: CachedState<DictStateReader>,
     pub caller_address: ContractAddress,
     pub events: Vec<TestEvent>,
@@ -69,7 +69,7 @@ impl TestContext {
         let (contract_address, _retdata) = factory.create_state(&mut state);
         // get type name of factory
         Self {
-            contract_addresses: HashMap::from([(T::name(), contract_address)]),
+            contract_addresses: HashMap::from([(factory.name(), contract_address)]),
             state,
             caller_address: Signers::Alice.into(),
             events: vec![],
@@ -83,7 +83,7 @@ impl TestContext {
         // get type name of factory
         (
             Self {
-                contract_addresses: HashMap::from([(T::name(), contract_address)]),
+                contract_addresses: HashMap::from([(factory.name(), contract_address)]),
                 state,
                 caller_address: Signers::Alice.into(),
                 events: call_info.execution.events.iter().map(|e| e.clone().into()).collect(),
@@ -103,14 +103,14 @@ impl TestContext {
         self.caller_address = caller_address;
     }
 
-    pub fn contract_address(&self, contract_name: &str) -> ContractAddress {
+    pub fn contract_address(&self, contract_name: &String) -> ContractAddress {
         self.contract_addresses.get(contract_name).unwrap().clone()
     }
 
     pub fn patch_with_factory<T: StateFactory>(&mut self, factory: T) {
         let (contract_address, _) = factory.create_state(&mut self.state);
 
-        self.contract_addresses.insert(T::name(), contract_address);
+        self.contract_addresses.insert(factory.name(), contract_address);
     }
 
     pub fn add_manual_class_hash(&mut self, class_hash: ClassHash, contract_class: ContractClass) {
@@ -119,7 +119,7 @@ impl TestContext {
 
     pub fn call_entry_point(
         &mut self,
-        contract_name: &str,
+        contract_name: &String,
         entry_point_name: &str,
         calldata: Vec<StarkFelt>,
     ) -> Vec<Felt> {
@@ -137,7 +137,7 @@ impl TestContext {
 
     pub fn call_entry_point_raw(
         &mut self,
-        contract_name: &str,
+        contract_name: &String,
         entry_point_name: &str,
         calldata: Vec<StarkFelt>,
     ) -> CallInfo {

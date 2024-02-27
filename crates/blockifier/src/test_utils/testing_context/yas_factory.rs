@@ -6,6 +6,7 @@ use crate::execution::sierra_utils::{contract_address_to_felt, starkfelt_to_felt
 use crate::test_utils::testing_context::StateFactory;
 use crate::test_utils::{TEST_YAS_FACTORY_CONTRACT_CLASS_HASH, YAS_FACTORY_CONTRACT_PATH};
 
+#[derive(Debug, Clone, Default)]
 pub struct YASFactory {
     pub deployer: ContractAddress,
     pub pool_class_hash: ClassHash,
@@ -31,7 +32,7 @@ impl StateFactory for YASFactory {
         SierraContractClassV1::from_file(YAS_FACTORY_CONTRACT_PATH).into()
     }
 
-    fn name() -> &'static str {
-        "YASFactory"
+    fn name(&self) -> String {
+        String::from("YASFactory")
     }
 }

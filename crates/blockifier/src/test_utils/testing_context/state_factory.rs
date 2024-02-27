@@ -40,5 +40,5 @@ pub trait StateFactory {
 
     fn contract_class(&self) -> ContractClass;
 
-    fn name() -> &'static str;
+    fn name(&self) -> String;
 }

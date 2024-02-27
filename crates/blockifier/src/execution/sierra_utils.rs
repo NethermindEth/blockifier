@@ -122,6 +122,7 @@ pub fn get_sierra_entry_function_id<'a>(
         .id
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn setup_syscall_handler(
     state: &mut dyn State,
     caller_address: ContractAddress,

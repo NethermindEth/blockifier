@@ -5,11 +5,18 @@ use crate::execution::sierra_utils::contract_address_to_felt;
 use crate::test_utils::testing_context::{Signers, StateFactory};
 use crate::test_utils::{ERC20_FULL_CONTRACT_PATH, TEST_ERC20_FULL_CONTRACT_CLASS_HASH};
 
-pub struct ERC20Factory {}
+#[derive(Debug, Clone, Default)]
+pub struct ERC20Factory {
+    pub name: Option<String>,
+}
 
 impl<'a> ERC20Factory {
     pub fn new() -> Self {
-        ERC20Factory {}
+        ERC20Factory { name: None }
+    }
+
+    pub fn with_name(name: String) -> Self {
+        ERC20Factory { name: Some(name) }
     }
 }
 
@@ -29,7 +36,7 @@ impl StateFactory for ERC20Factory {
         SierraContractClassV1::from_file(ERC20_FULL_CONTRACT_PATH).into()
     }
 
-    fn name() -> &'static str {
-        "ERC20Factory"
+    fn name(&self) -> String {
+        if let Some(name) = &self.name { name.clone() } else { "ERC20Factory".to_string() }
     }
 }

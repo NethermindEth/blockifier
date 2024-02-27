@@ -64,6 +64,11 @@ impl FeeAmount {
     }
 }
 
+#[allow(non_snake_case)]
+pub fn FACTORY_NAME() -> String {
+    YASFactory::default().name()
+}
+
 #[cfg(test)]
 mod constructor_tests {
     use super::*;
@@ -85,7 +90,7 @@ mod constructor_tests {
         let (mut context, _) = setup(OWNER().into(), None);
 
         assert_eq!(
-            context.call_entry_point(YASFactory::name(), "owner", vec![]),
+            context.call_entry_point(&FACTORY_NAME(), "owner", vec![]),
             vec![OWNER().into()]
         );
     }
@@ -96,7 +101,7 @@ mod constructor_tests {
 
         assert_eq!(
             context.call_entry_point(
-                YASFactory::name(),
+                &FACTORY_NAME(),
                 "fee_amount_tick_spacing",
                 vec![StarkFelt::from(FeeAmount::Custom.fee_amount())]
             ),
@@ -105,7 +110,7 @@ mod constructor_tests {
 
         assert_eq!(
             context.call_entry_point(
-                YASFactory::name(),
+                &FACTORY_NAME(),
                 "fee_amount_tick_spacing",
                 vec![StarkFelt::from(FeeAmount::Low.fee_amount())]
             ),
@@ -114,7 +119,7 @@ mod constructor_tests {
 
         assert_eq!(
             context.call_entry_point(
-                YASFactory::name(),
+                &FACTORY_NAME(),
                 "fee_amount_tick_spacing",
                 vec![StarkFelt::from(FeeAmount::Medium.fee_amount())]
             ),
@@ -123,7 +128,7 @@ mod constructor_tests {
 
         assert_eq!(
             context.call_entry_point(
-                YASFactory::name(),
+                &FACTORY_NAME(),
                 "fee_amount_tick_spacing",
                 vec![StarkFelt::from(FeeAmount::High.fee_amount())]
             ),
@@ -203,19 +208,19 @@ fn test_create_pool(fee_amount: FeeAmount) {
     context.set_caller(OTHER().into());
 
     let pool_deployed = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(fee_amount.fee_amount())],
     );
 
     let pool_token_a_token_b = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "pool",
         vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(fee_amount.fee_amount())],
     );
 
     let pool_token_b_token_a = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "pool",
         vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(fee_amount.fee_amount())],
     );
@@ -275,7 +280,7 @@ fn test_create_pool_arguments_edge_cases(
     context.set_caller(OTHER().into());
 
     let pool_deployed = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![token_a.into(), token_b.into(), StarkFelt::from(fee_amount.fee_amount())],
     );
@@ -291,13 +296,13 @@ fn test_create_pool_fails_if_token_pair_is_already_created() {
     context.set_caller(OTHER().into());
 
     let _ = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
     );
 
     let pool_deployed = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
     );
@@ -313,13 +318,13 @@ fn test_create_pool_fails_if_token_pair_is_already_created_invert_order() {
     context.set_caller(OTHER().into());
 
     let _ = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
     );
 
     let pool_deployed = context.call_entry_point(
-        YASFactory::name(),
+        &FACTORY_NAME(),
         "create_pool",
         vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
     );
@@ -338,8 +343,7 @@ mod set_owner_tests {
         context.clean_events();
         context.set_caller(OTHER().into());
 
-        let result =
-            context.call_entry_point(YASFactory::name(), "set_owner", vec![OTHER().into()]);
+        let result = context.call_entry_point(&FACTORY_NAME(), "set_owner", vec![OTHER().into()]);
 
         assert_eq!(result, vec![string_to_felt("only owner can do this action!").unwrap()]);
     }
@@ -351,13 +355,12 @@ mod set_owner_tests {
         context.clean_events();
         context.set_caller(OWNER().into());
 
-        let result =
-            context.call_entry_point(YASFactory::name(), "set_owner", vec![OTHER().into()]);
+        let result = context.call_entry_point(&FACTORY_NAME(), "set_owner", vec![OTHER().into()]);
 
         assert_eq!(result, vec![]);
 
         assert_eq!(
-            context.call_entry_point(YASFactory::name(), "owner", vec![]),
+            context.call_entry_point(&FACTORY_NAME(), "owner", vec![]),
             vec![OTHER().into()]
         );
 
@@ -380,7 +383,7 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OTHER().into());
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(100u32), StarkFelt::from(2u32), StarkFelt::from(0u32)],
         );
@@ -396,7 +399,7 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(1000000u128), StarkFelt::from(20u32), StarkFelt::from(0u32)],
         );
@@ -412,7 +415,7 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(500u32), StarkFelt::from(0u32), StarkFelt::from(0u32)],
         );
@@ -428,13 +431,13 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let _ = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
         );
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(50u32), StarkFelt::from(10u32), StarkFelt::from(0u32)],
         );
@@ -450,13 +453,13 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let _ = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
         );
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "fee_amount_tick_spacing",
             vec![StarkFelt::from(50u32)],
         );
@@ -472,7 +475,7 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let result = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
         );
@@ -494,25 +497,25 @@ mod set_enable_fee_amount_tests {
         context.set_caller(OWNER().into());
 
         let _ = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "enable_fee_amount",
             vec![StarkFelt::from(250u32), StarkFelt::from(15u32), StarkFelt::from(0u32)],
         );
 
         let pool_deployed = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "create_pool",
             vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(250u32)],
         );
 
         let pool_token_a_token_b = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "pool",
             vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(250u32)],
         );
 
         let pool_token_b_token_a = context.call_entry_point(
-            YASFactory::name(),
+            &FACTORY_NAME(),
             "pool",
             vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(250u32)],
         );
