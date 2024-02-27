@@ -328,6 +328,7 @@ pub fn calculate_class_info_for_testing(contract_class: ContractClass) -> ClassI
     let sierra_program_length = match contract_class {
         ContractClass::V0(_) => 0,
         ContractClass::V1(_) => 100,
+        ContractClass::V1Sierra(_) => todo!("it probably should be 100 as well"),
     };
     ClassInfo::new(&contract_class, sierra_program_length, 100).unwrap()
 }
