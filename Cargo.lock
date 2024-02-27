@@ -445,6 +445,7 @@ dependencies = [
  "cairo-vm",
  "ctor",
  "derive_more",
+ "hex",
  "indexmap 2.2.1",
  "itertools 0.10.5",
  "keccak",

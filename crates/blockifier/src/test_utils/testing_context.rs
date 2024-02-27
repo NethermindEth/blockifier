@@ -19,6 +19,7 @@ use starknet_api::hash::StarkFelt;
 use starknet_api::transaction::{Calldata, ContractAddressSalt};
 use starknet_types_core::felt::Felt;
 pub use state_factory::*;
+pub use string_utils::*;
 pub use test_event::*;
 pub use yas_erc20_factory::*;
 pub use yas_factory::*;

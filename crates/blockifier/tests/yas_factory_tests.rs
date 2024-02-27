@@ -2,7 +2,8 @@ use blockifier::execution::call_info::CallInfo;
 use blockifier::execution::contract_class::SierraContractClassV1;
 use blockifier::execution::sierra_utils::felt_to_starkfelt;
 use blockifier::test_utils::testing_context::{
-    StateFactory, TestContext, YASFactory, OTHER, OWNER, TOKEN_A, TOKEN_B, ZERO,
+    string_to_felt, Signers, StateFactory, TestContext, YASFactory, OTHER, OWNER, TOKEN_A, TOKEN_B,
+    ZERO,
 };
 use blockifier::test_utils::{TEST_YAS_POOL_CONTRACT_CLASS_HASH, YAS_POOL_CONTRACT_PATH};
 use starknet_api::class_hash;
@@ -38,6 +39,7 @@ pub enum FeeAmount {
     Low,
     Medium,
     High,
+    Other(u32, u32),
 }
 
 impl FeeAmount {
@@ -47,6 +49,7 @@ impl FeeAmount {
             FeeAmount::Low => 500,
             FeeAmount::Medium => 3000,
             FeeAmount::High => 10000,
+            FeeAmount::Other(amount, _) => *amount,
         }
     }
 
@@ -56,6 +59,7 @@ impl FeeAmount {
             FeeAmount::Low => 10,
             FeeAmount::Medium => 60,
             FeeAmount::High => 200,
+            FeeAmount::Other(_, amount) => *amount,
         }
     }
 }
@@ -219,13 +223,6 @@ fn test_create_pool(fee_amount: FeeAmount) {
     assert_eq!(pool_deployed, pool_token_a_token_b);
     assert_eq!(pool_deployed, pool_token_b_token_a);
 
-    match fee_amount {
-        FeeAmount::Custom => {
-            panic!("Custom fee amount should not be enabled by default");
-        }
-        _ => (),
-    }
-
     // Verify PoolCreated event emitted
     let event = context.get_event(0).unwrap();
     let pool_deployed = *pool_deployed.first().unwrap();
@@ -236,4 +233,302 @@ fn test_create_pool(fee_amount: FeeAmount) {
     assert_eq!(event.data[3], Felt::from(fee_amount.tick_spacing()));
     assert_eq!(event.data[4], Felt::from(0u8));
     assert_eq!(event.data[5], pool_deployed);
+}
+
+#[test_case(
+    TOKEN_A(),
+    TOKEN_A(),
+    FeeAmount::Low,
+    "tokens must be different";
+    "fails_if_tokens_are_the_same"
+)]
+#[test_case(
+    ZERO(),
+    TOKEN_B(),
+    FeeAmount::Low,
+    "tokens addresses cannot be zero";
+    "token_a_zero"
+)]
+#[test_case(
+    TOKEN_A(),
+    ZERO(),
+    FeeAmount::Low,
+    "tokens addresses cannot be zero";
+    "token_b_zero"
+)]
+#[test_case(
+    TOKEN_A(),
+    TOKEN_B(),
+    FeeAmount::Other(1, 1),
+    "tick spacing not initialized";
+    "fails_if_fee_amount_is_not_enabled"
+)]
+fn test_create_pool_arguments_edge_cases(
+    token_a: Signers,
+    token_b: Signers,
+    fee_amount: FeeAmount,
+    error_message: &'static str,
+) {
+    let (mut context, _) = setup(OWNER().into(), None);
+
+    context.clean_events();
+    context.set_caller(OTHER().into());
+
+    let pool_deployed = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![token_a.into(), token_b.into(), StarkFelt::from(fee_amount.fee_amount())],
+    );
+
+    assert_eq!(pool_deployed, vec![string_to_felt(&error_message).unwrap()]);
+}
+
+#[test]
+fn test_create_pool_fails_if_token_pair_is_already_created() {
+    let (mut context, _) = setup(OWNER().into(), None);
+
+    context.clean_events();
+    context.set_caller(OTHER().into());
+
+    let _ = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
+    );
+
+    let pool_deployed = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
+    );
+
+    assert_eq!(pool_deployed, vec![string_to_felt("token pair already created").unwrap()]);
+}
+
+#[test]
+fn test_create_pool_fails_if_token_pair_is_already_created_invert_order() {
+    let (mut context, _) = setup(OWNER().into(), None);
+
+    context.clean_events();
+    context.set_caller(OTHER().into());
+
+    let _ = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
+    );
+
+    let pool_deployed = context.call_entry_point(
+        YASFactory::name(),
+        "create_pool",
+        vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(FeeAmount::Low.fee_amount())],
+    );
+
+    assert_eq!(pool_deployed, vec![string_to_felt("token pair already created").unwrap()]);
+}
+
+#[cfg(test)]
+mod set_owner_tests {
+    use super::*;
+
+    #[test]
+    fn test_fails_if_caller_is_not_owner() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OTHER().into());
+
+        let result =
+            context.call_entry_point(YASFactory::name(), "set_owner", vec![OTHER().into()]);
+
+        assert_eq!(result, vec![string_to_felt("only owner can do this action!").unwrap()]);
+    }
+
+    #[test]
+    fn test_success_when_caller_is_owner_and_emits_events() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let result =
+            context.call_entry_point(YASFactory::name(), "set_owner", vec![OTHER().into()]);
+
+        assert_eq!(result, vec![]);
+
+        assert_eq!(
+            context.call_entry_point(YASFactory::name(), "owner", vec![]),
+            vec![OTHER().into()]
+        );
+
+        let event = context.get_event(0).unwrap();
+
+        assert_eq!(event.data[0], OWNER().into());
+        assert_eq!(event.data[1], OTHER().into());
+    }
+}
+
+#[cfg(test)]
+mod set_enable_fee_amount_tests {
+    use super::*;
+
+    #[test]
+    fn test_fails_if_caller_is_not_owner() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OTHER().into());
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(100u32), StarkFelt::from(2u32), StarkFelt::from(0u32)],
+        );
+
+        assert_eq!(result, vec![string_to_felt("only owner can do this action!").unwrap()]);
+    }
+
+    #[test]
+    fn test_fails_if_fee_is_too_large() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(1000000u128), StarkFelt::from(20u32), StarkFelt::from(0u32)],
+        );
+
+        assert_eq!(result, vec![string_to_felt("fee cannot be gt 1000000").unwrap()]);
+    }
+
+    #[test]
+    fn test_fails_if_tick_spacing_is_too_small() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(500u32), StarkFelt::from(0u32), StarkFelt::from(0u32)],
+        );
+
+        assert_eq!(result, vec![string_to_felt("wrong tick_spacing (0<ts<16384)").unwrap()]);
+    }
+
+    #[test]
+    fn test_fails_if_already_initialized() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let _ = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
+        );
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(50u32), StarkFelt::from(10u32), StarkFelt::from(0u32)],
+        );
+
+        assert_eq!(result, vec![string_to_felt("fee amount already initialized").unwrap()]);
+    }
+
+    #[test]
+    fn test_set_fee_amount_in_the_mapping() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let _ = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
+        );
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "fee_amount_tick_spacing",
+            vec![StarkFelt::from(50u32)],
+        );
+
+        assert_eq!(result, vec![Felt::from(1u32), Felt::from(0u32)]);
+    }
+
+    #[test]
+    fn test_emits_event() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let result = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(50u32), StarkFelt::from(1u32), StarkFelt::from(0u32)],
+        );
+
+        assert_eq!(result, vec![]);
+
+        let event = context.get_event(0).unwrap();
+
+        assert_eq!(event.data[0], Felt::from(50u32), "fee event should be 50");
+        assert_eq!(event.data[1], Felt::from(1u32), "tick_spacing event should be 1");
+        assert_eq!(event.data[2], Felt::from(0u32), "tick_spacing event should be 1");
+    }
+
+    #[test]
+    fn test_enables_pool_creation() {
+        let (mut context, _) = setup(OWNER().into(), None);
+
+        context.clean_events();
+        context.set_caller(OWNER().into());
+
+        let _ = context.call_entry_point(
+            YASFactory::name(),
+            "enable_fee_amount",
+            vec![StarkFelt::from(250u32), StarkFelt::from(15u32), StarkFelt::from(0u32)],
+        );
+
+        let pool_deployed = context.call_entry_point(
+            YASFactory::name(),
+            "create_pool",
+            vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(250u32)],
+        );
+
+        let pool_token_a_token_b = context.call_entry_point(
+            YASFactory::name(),
+            "pool",
+            vec![TOKEN_A().into(), TOKEN_B().into(), StarkFelt::from(250u32)],
+        );
+
+        let pool_token_b_token_a = context.call_entry_point(
+            YASFactory::name(),
+            "pool",
+            vec![TOKEN_B().into(), TOKEN_A().into(), StarkFelt::from(250u32)],
+        );
+
+        assert_eq!(pool_deployed, pool_token_a_token_b, "wrong pool in order result");
+        assert_eq!(pool_deployed, pool_token_b_token_a, "wrong pool in reverse result");
+
+        // Verify PoolCreated event emitted
+        let event = context.get_event(1).unwrap();
+        let pool_deployed = *pool_deployed.first().unwrap();
+
+        assert_eq!(event.data[0], TOKEN_A().into(), "event token_0 should be TOKEN_A");
+        assert_eq!(event.data[1], TOKEN_B().into(), "event token_1 should be TOKEN_B");
+        assert_eq!(event.data[2], Felt::from(250u32), "event fee should be 250");
+        assert_eq!(event.data[3], Felt::from(15u32), "tick_spacing.lo event should be 15");
+        assert_eq!(event.data[4], Felt::from(0u32), "tick_spacing.hi event should be 0");
+        assert_eq!(event.data[5], pool_deployed, "wrong event pool address");
+    }
 }
