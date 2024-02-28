@@ -87,9 +87,9 @@ fn assert_consistent_contract_version(contract: FeatureContract, state: &dyn Sta
     }
 }
 
-#[test_case(FeatureContract::SierraTestContract; "Native")]
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")]
-fn test_storage_read_write(test_contract: FeatureContract) {
+#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), REQUIRED_GAS_STORAGE_READ_WRITE_TEST; "VM")]
+fn test_storage_read_write(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
 
@@ -108,7 +108,7 @@ fn test_storage_read_write(test_contract: FeatureContract) {
         entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             retdata: retdata![stark_felt!(value)],
-            gas_consumed: NATIVE_GAS_PLACEHOLDER,
+            gas_consumed: expected_gas,
             ..CallExecution::default()
         }
     );
