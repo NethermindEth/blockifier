@@ -24,6 +24,7 @@ pub fn execute_entry_point_call(
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
 ) -> Result<CallInfo, EntryPointExecutionError> {
+    // println!("Executing through native");
     let sierra_program: &SierraProgram = get_program(&contract_class);
     let contract_entrypoints: &ContractEntryPoints = get_entrypoints(&contract_class);
 

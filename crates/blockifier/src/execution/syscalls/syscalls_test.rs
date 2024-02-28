@@ -28,10 +28,11 @@ use crate::execution::call_info::{
     CallExecution, CallInfo, MessageToL1, OrderedEvent, OrderedL2ToL1Message, Retdata,
 };
 use crate::execution::common_hints::ExecutionMode;
-use crate::execution::contract_class::ContractClassV0;
+use crate::execution::contract_class::{ContractClass, ContractClassV0};
 use crate::execution::entry_point::CallEntryPoint;
 use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
+use crate::execution::sierra_utils::NATIVE_GAS_PLACEHOLDER;
 use crate::execution::syscalls::hint_processor::{
     EmitEventError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_EXECUTE_CALL, FAILED_TO_GET_CONTRACT_CLASS,
     FORBIDDEN_CLASS_REPLACEMENT, INVALID_EXECUTION_MODE_ERROR, L1_GAS, L2_GAS, OUT_OF_GAS_ERROR,
@@ -59,11 +60,40 @@ pub const REQUIRED_GAS_STORAGE_READ_WRITE_TEST: u64 = 34650;
 pub const REQUIRED_GAS_CALL_CONTRACT_TEST: u64 = 128080;
 pub const REQUIRED_GAS_LIBRARY_CALL_TEST: u64 = REQUIRED_GAS_CALL_CONTRACT_TEST;
 
-#[test]
-fn test_storage_read_write() {
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
+fn assert_contract_uses_native(class_hash: ClassHash, state: &dyn State) {
+    assert_matches!(
+        state.get_compiled_contract_class(class_hash).expect(&format!("Expected contract class at {class_hash}")),
+        ContractClass::V1Sierra(_)
+    )
+}
+
+fn assert_contract_uses_vm(class_hash: ClassHash, state: &dyn State) {
+    assert_matches!(
+        state.get_compiled_contract_class(class_hash).expect(&format!("Expected contract class at {class_hash}")),
+        ContractClass::V1(_) | ContractClass::V0(_)
+    )
+}
+
+fn assert_consistent_contract_version(contract: FeatureContract, state: &dyn State) {
+    let hash = contract.get_class_hash();
+    match contract {
+        FeatureContract::SecurityTests | FeatureContract::ERC20 => assert_contract_uses_vm(hash, state),
+        FeatureContract::LegacyTestContract | FeatureContract::SierraTestContract => assert_contract_uses_native(hash, state),
+        FeatureContract::AccountWithLongValidate(_) 
+        | FeatureContract::AccountWithoutValidations(_)
+        | FeatureContract::Empty(_)
+        | FeatureContract::FaultyAccount(_)
+        | FeatureContract::TestContract(_) => assert_contract_uses_vm(hash, state),
+    }
+}
+
+#[test_case(FeatureContract::SierraTestContract; "Native")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")]
+fn test_storage_read_write(test_contract: FeatureContract) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
+
+    assert_consistent_contract_version(test_contract, &state);
 
     let key = stark_felt!(1234_u16);
     let value = stark_felt!(18_u8);
@@ -78,7 +108,7 @@ fn test_storage_read_write() {
         entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             retdata: retdata![stark_felt!(value)],
-            gas_consumed: REQUIRED_GAS_STORAGE_READ_WRITE_TEST,
+            gas_consumed: NATIVE_GAS_PLACEHOLDER,
             ..CallExecution::default()
         }
     );
@@ -86,17 +116,41 @@ fn test_storage_read_write() {
     let value_from_state =
         state.get_storage_at(storage_address, StorageKey::try_from(key).unwrap()).unwrap();
     assert_eq!(value_from_state, value);
+
+    // ensure that the fallback system didn't replace the contract
+    assert_consistent_contract_version(test_contract, &state);
 }
 
-#[test]
-fn test_call_contract() {
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
+#[test_case(
+    FeatureContract::SierraTestContract,
+    FeatureContract::SierraTestContract,
+    NATIVE_GAS_PLACEHOLDER;
+    "Call Contract between two contracts using Native")]
+#[test_case(
+    FeatureContract::SierraTestContract,
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    NATIVE_GAS_PLACEHOLDER;
+    "Call Contract with caller using Native and callee using VM")]
+#[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    FeatureContract::SierraTestContract,
+    93430 + NATIVE_GAS_PLACEHOLDER;
+    "Call Contract with caller using VM and callee using Native")]
+#[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    REQUIRED_GAS_CALL_CONTRACT_TEST;
+    "Call Contract between two contracts using VM")]
+fn test_call_contract(outer_contract: FeatureContract, inner_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
-    let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
+    let mut state = test_state(chain_info, BALANCE, &[(outer_contract, 1), (inner_contract, 1)]);
+
+    assert_consistent_contract_version(outer_contract, &state);
+    assert_consistent_contract_version(inner_contract, &state);
 
     let outer_entry_point_selector = selector_from_name("test_call_contract");
     let calldata = create_calldata(
-        FeatureContract::TestContract(CairoVersion::Cairo1).get_instance_address(0),
+        inner_contract.get_instance_address(0),
         "test_storage_read_write",
         &[
             stark_felt!(405_u16), // Calldata: address.
@@ -106,27 +160,33 @@ fn test_call_contract() {
     let entry_point_call = CallEntryPoint {
         entry_point_selector: outer_entry_point_selector,
         calldata,
-        ..trivial_external_entry_point_new(test_contract)
+        ..trivial_external_entry_point_new(outer_contract)
     };
+
     assert_eq!(
         entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             retdata: retdata![stark_felt!(48_u8)],
-            gas_consumed: 34650,
+            gas_consumed: expected_gas,
             ..CallExecution::default()
         }
     );
+
+    // ensure that the fallback system didn't replace the contract
+    assert_consistent_contract_version(outer_contract, &state);
+    assert_consistent_contract_version(inner_contract, &state);
 }
 
-#[test]
-fn test_emit_event() {
+#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // NATIVE BUG - immarg operand has non-immediate parameter
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 82930; "VM")]
+fn test_emit_event(test_contract: FeatureContract, expected_gas: u64) {
     let versioned_constants = VersionedConstants::create_for_testing();
     // Positive flow.
     let keys = vec![stark_felt!(2019_u16), stark_felt!(2020_u16)];
     let data = vec![stark_felt!(2021_u16), stark_felt!(2022_u16), stark_felt!(2023_u16)];
     // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion works.
     let n_emitted_events = vec![stark_felt!(1_u16)];
-    let call_info = emit_events(&n_emitted_events, &keys, &data).unwrap();
+    let call_info = emit_events(test_contract, &n_emitted_events, &keys, &data).unwrap();
     let event = EventContent {
         keys: keys.clone().into_iter().map(EventKey).collect(),
         data: EventData(data.clone()),
@@ -135,7 +195,7 @@ fn test_emit_event() {
         call_info.execution,
         CallExecution {
             events: vec![OrderedEvent { order: 0, event }],
-            gas_consumed: 82930,
+            gas_consumed: expected_gas,
             ..Default::default()
         }
     );
@@ -143,7 +203,7 @@ fn test_emit_event() {
     // Negative flow, the data length exceeds the limit.
     let max_event_data_length = versioned_constants.tx_event_limits.max_data_length;
     let data_too_long = vec![stark_felt!(2_u16); max_event_data_length + 1];
-    let error = emit_events(&n_emitted_events, &keys, &data_too_long).unwrap_err();
+    let error = emit_events(test_contract, &n_emitted_events, &keys, &data_too_long).unwrap_err();
     let expected_error = EmitEventError::ExceedsMaxDataLength {
         data_length: max_event_data_length + 1,
         max_data_length: max_event_data_length,
@@ -153,7 +213,7 @@ fn test_emit_event() {
     // Negative flow, the keys length exceeds the limit.
     let max_event_keys_length = versioned_constants.tx_event_limits.max_keys_length;
     let keys_too_long = vec![stark_felt!(1_u16); max_event_keys_length + 1];
-    let error = emit_events(&n_emitted_events, &keys_too_long, &data).unwrap_err();
+    let error = emit_events(test_contract, &n_emitted_events, &keys_too_long, &data).unwrap_err();
     let expected_error = EmitEventError::ExceedsMaxKeysLength {
         keys_length: max_event_keys_length + 1,
         max_keys_length: max_event_keys_length,
@@ -165,7 +225,7 @@ fn test_emit_event() {
     let n_emitted_events_too_big = vec![stark_felt!(
         u16::try_from(max_n_emitted_events + 1).expect("Failed to convert usize to u16.")
     )];
-    let error = emit_events(&n_emitted_events_too_big, &keys, &data).unwrap_err();
+    let error = emit_events(test_contract, &n_emitted_events_too_big, &keys, &data).unwrap_err();
     let expected_error = EmitEventError::ExceedsMaxNumberOfEmittedEvents {
         n_emitted_events: max_n_emitted_events + 1,
         max_n_emitted_events,
@@ -174,13 +234,14 @@ fn test_emit_event() {
 }
 
 fn emit_events(
+    test_contract: FeatureContract,
     n_emitted_events: &[StarkFelt],
     keys: &[StarkFelt],
     data: &[StarkFelt],
 ) -> Result<CallInfo, EntryPointExecutionError> {
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
+    assert_consistent_contract_version(test_contract, &state);
     let calldata = Calldata(
         concat(vec![
             n_emitted_events.to_owned(),
@@ -198,14 +259,17 @@ fn emit_events(
         ..trivial_external_entry_point_new(test_contract)
     };
 
-    entry_point_call.execute_directly(&mut state)
+    let result = entry_point_call.execute_directly(&mut state);
+    assert_consistent_contract_version(test_contract, &state);
+    result
 }
 
-#[test]
-fn test_get_block_hash() {
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
+#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // BUG - immarg operand has non-immedate paramete
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 14250; "VM")] // BUG - vm validate mode
+fn test_get_block_hash(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
+    assert_consistent_contract_version(test_contract, &state);
 
     // Initialize block number -> block hash entry.
     let upper_bound_block_number = CURRENT_BLOCK_NUMBER - constants::STORED_BLOCK_HASH_BUFFER;
@@ -226,11 +290,15 @@ fn test_get_block_hash() {
 
     assert_eq!(
         entry_point_call.clone().execute_directly(&mut state).unwrap().execution,
-        CallExecution { gas_consumed: 34650, ..CallExecution::from_retdata(retdata![block_hash]) }
+        CallExecution { gas_consumed: expected_gas, ..CallExecution::from_retdata(retdata![block_hash]) }
     );
+
+    assert_consistent_contract_version(test_contract, &state);
 
     // Negative flow. Execution mode is Validate.
     let execution_result = entry_point_call.execute_directly_in_validate_mode(&mut state).unwrap();
+
+    assert_consistent_contract_version(test_contract, &state);
 
     matches!(execution_result, CallInfo { execution: CallExecution { failed: true, .. }, .. });
 
@@ -247,6 +315,8 @@ fn test_get_block_hash() {
         ..trivial_external_entry_point_new(test_contract)
     };
     let execution_result = entry_point_call.execute_directly(&mut state).unwrap();
+
+    assert_consistent_contract_version(test_contract, &state);
 
     matches!(execution_result, CallInfo { execution: CallExecution { failed: true, .. }, .. });
 
@@ -270,7 +340,7 @@ fn test_keccak() {
 
     assert_eq!(
         entry_point_call.execute_directly(&mut state).unwrap().execution,
-        CallExecution { gas_consumed: 34650, ..CallExecution::from_retdata(retdata![]) }
+        CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, ..CallExecution::from_retdata(retdata![]) }
     );
 }
 
@@ -504,13 +574,12 @@ fn test_get_execution_info(
 }
 
 #[test]
-fn test_library_call() {
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
+fn test_library_call() { //DONE
+    let test_contract = FeatureContract::SierraTestContract;
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
 
     let inner_entry_point_selector = selector_from_name("test_storage_read_write");
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
     let calldata = calldata![
         test_contract.get_class_hash().0, // Class hash.
         inner_entry_point_selector.0,     // Function selector.
@@ -530,7 +599,7 @@ fn test_library_call() {
         entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             retdata: retdata![stark_felt!(91_u16)],
-            gas_consumed: 34650,
+            gas_consumed: NATIVE_GAS_PLACEHOLDER,
             ..Default::default()
         }
     );
@@ -560,7 +629,7 @@ fn test_library_call_assert_fails() {
 
     assert_eq!(
         entry_point_call.execute_directly(&mut state).unwrap().execution,
-        CallExecution { gas_consumed: 34650, failed: true, retdata, ..Default::default() }
+        CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, failed: true, retdata, ..Default::default() }
     );
 }
 
@@ -701,7 +770,7 @@ fn test_replace_class() {
     let retdata = Retdata(vec![stark_felt!(FAILED_TO_GET_CONTRACT_CLASS)]);
     assert_eq!(
         error.execution,
-        CallExecution { gas_consumed: 34650, retdata, failed: true, ..Default::default() }
+        CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, retdata, failed: true, ..Default::default() }
     );
 
     // Replace with Cairo 0 class hash.
@@ -719,7 +788,7 @@ fn test_replace_class() {
 
     assert_eq!(
         error.unwrap().execution,
-        CallExecution { gas_consumed: 34650, retdata, failed: true, ..Default::default() }
+        CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, retdata, failed: true, ..Default::default() }
     );
 
     // Positive flow.
@@ -735,7 +804,7 @@ fn test_replace_class() {
 
     assert_eq!(
         entry_point_call.execute_directly(&mut state).unwrap().execution,
-        CallExecution { gas_consumed: 34650, ..Default::default() }
+        CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, ..Default::default() }
     );
     assert_eq!(state.get_class_hash_at(contract_address).unwrap(), new_class_hash);
 }
@@ -811,7 +880,7 @@ fn test_send_message_to_l1() {
         entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             l2_to_l1_messages: vec![OrderedL2ToL1Message { order: 0, message }],
-            gas_consumed: 34650,
+            gas_consumed: NATIVE_GAS_PLACEHOLDER,
             ..Default::default()
         }
     );
@@ -897,7 +966,7 @@ fn test_deploy(
         let retdata = Retdata(vec![stark_felt!(expected_error)]);
         assert_eq!(
             call_info,
-            CallExecution { gas_consumed: 34650, failed: true, retdata, ..Default::default() }
+            CallExecution { gas_consumed: NATIVE_GAS_PLACEHOLDER, failed: true, retdata, ..Default::default() }
         );
         return;
     }
@@ -920,7 +989,7 @@ fn test_deploy(
         0
     } else {
         retdata.0.push(constructor_calldata.0[0]);
-        34650
+        NATIVE_GAS_PLACEHOLDER
     };
 
     assert_eq!(

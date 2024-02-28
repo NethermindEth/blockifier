@@ -26,6 +26,10 @@ use super::native_syscall_handler::NativeSyscallHandler;
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::state::state_api::State;
 
+// An arbitrary number, chosen to avoid accidentally aligning with actually calculated gas
+// To be deleted once cairo native gas handling can be used
+pub const NATIVE_GAS_PLACEHOLDER: u64 = 12;
+
 pub fn get_program(contract_class: &SierraContractClassV1) -> &SierraProgram {
     &contract_class.sierra_program
 }
@@ -237,7 +241,7 @@ pub fn create_callinfo(
             events,
             l2_to_l1_messages,
             failed: run_result.failure_flag,
-            gas_consumed: 34650, // TODO use cairo native's gas logic
+            gas_consumed: NATIVE_GAS_PLACEHOLDER
         },
         resources: ExecutionResources {
             n_steps: 0,
