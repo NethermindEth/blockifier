@@ -6,6 +6,8 @@ mod test_event;
 mod yas_erc20_factory;
 mod yas_factory;
 mod yas_faucet_factory;
+mod yas_router;
+mod yas_test_fixtures;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -24,6 +26,8 @@ pub use test_event::*;
 pub use yas_erc20_factory::*;
 pub use yas_factory::*;
 pub use yas_faucet_factory::*;
+pub use yas_router::*;
+pub use yas_test_fixtures::*;
 
 use crate::abi::abi_utils::selector_from_name;
 use crate::block_context::BlockContext;
@@ -66,13 +70,18 @@ pub struct TestContext {
 impl TestContext {
     pub fn new<T: StateFactory>(factory: T) -> Self {
         let mut state = create_custom_deploy_test_state(vec![], vec![]);
-        let (contract_address, _retdata) = factory.create_state(&mut state);
+        let (contract_address, call_info) = factory.create_state(&mut state);
+
+        if call_info.execution.failed {
+            panic!("Failed to deploy contract");
+        }
+
         // get type name of factory
         Self {
             contract_addresses: HashMap::from([(factory.name(), contract_address)]),
             state,
             caller_address: Signers::Alice.into(),
-            events: vec![],
+            events: call_info.execution.events.iter().map(|e| e.clone().into()).collect(),
             block_context: BlockContext::create_for_testing(),
         }
     }
@@ -107,10 +116,22 @@ impl TestContext {
         self.contract_addresses.get(contract_name).unwrap().clone()
     }
 
+    pub fn register_contract(&mut self, contract_name: String, contract_address: ContractAddress) {
+        self.contract_addresses.insert(contract_name, contract_address);
+    }
+
     pub fn patch_with_factory<T: StateFactory>(&mut self, factory: T) {
         let (contract_address, _) = factory.create_state(&mut self.state);
 
         self.contract_addresses.insert(factory.name(), contract_address);
+    }
+
+    pub fn with_factory<T: StateFactory>(mut self, factory: T) -> Self {
+        let (contract_address, _) = factory.create_state(&mut self.state);
+
+        self.contract_addresses.insert(factory.name(), contract_address);
+
+        self
     }
 
     pub fn add_manual_class_hash(&mut self, class_hash: ClassHash, contract_class: ContractClass) {
@@ -123,7 +144,18 @@ impl TestContext {
         entry_point_name: &str,
         calldata: Vec<StarkFelt>,
     ) -> Vec<Felt> {
-        let result = self.call_entry_point_raw(contract_name, entry_point_name, calldata);
+        let contract_address = self.contract_address(contract_name);
+        let result = self.call_entry_point_raw(contract_address, entry_point_name, calldata);
+        result.execution.retdata.0.iter().map(|felt| starkfelt_to_felt(*felt)).collect()
+    }
+
+    pub fn call_address(
+        &mut self,
+        contract_address: ContractAddress,
+        entry_point_name: &str,
+        calldata: Vec<StarkFelt>,
+    ) -> Vec<Felt> {
+        let result = self.call_entry_point_raw(contract_address, entry_point_name, calldata);
         result.execution.retdata.0.iter().map(|felt| starkfelt_to_felt(*felt)).collect()
     }
 
@@ -137,13 +169,12 @@ impl TestContext {
 
     pub fn call_entry_point_raw(
         &mut self,
-        contract_name: &String,
+        contract_address: ContractAddress,
         entry_point_name: &str,
         calldata: Vec<StarkFelt>,
     ) -> CallInfo {
         let entry_point_selector = selector_from_name(entry_point_name);
         let calldata = Calldata(Arc::new(calldata));
-        let contract_address = self.contract_address(contract_name);
 
         let entry_point_call = CallEntryPoint {
             calldata,

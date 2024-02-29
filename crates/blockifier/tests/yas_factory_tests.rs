@@ -1,9 +1,8 @@
 use blockifier::execution::call_info::CallInfo;
 use blockifier::execution::contract_class::SierraContractClassV1;
-use blockifier::execution::sierra_utils::felt_to_starkfelt;
 use blockifier::test_utils::testing_context::{
-    string_to_felt, Signers, StateFactory, TestContext, YASFactory, OTHER, OWNER, TOKEN_A, TOKEN_B,
-    ZERO,
+    string_to_felt, FeeAmount, Signers, StateFactory, TestContext, YASFactory, FACTORY_NAME, OTHER,
+    OWNER, TOKEN_A, TOKEN_B, ZERO,
 };
 use blockifier::test_utils::{TEST_YAS_POOL_CONTRACT_CLASS_HASH, YAS_POOL_CONTRACT_PATH};
 use starknet_api::class_hash;
@@ -11,10 +10,6 @@ use starknet_api::core::{ClassHash, ContractAddress};
 use starknet_api::hash::{StarkFelt, StarkHash};
 use starknet_types_core::felt::Felt;
 use test_case::test_case;
-
-// pool class hash can not be zero
-pub const POOL_CLASS_HASH_CAN_NOT_BE_ZERO: &str =
-    "0x00706f6f6c20636c61737320686173682063616e206e6f74206265207a65726f";
 
 pub fn setup(
     deployer: ContractAddress,
@@ -33,44 +28,11 @@ pub fn setup(
 
     (context, call_info)
 }
-#[derive(Debug, Clone, Copy)]
-pub enum FeeAmount {
-    Custom,
-    Low,
-    Medium,
-    High,
-    Other(u32, u32),
-}
-
-impl FeeAmount {
-    pub fn fee_amount(&self) -> u32 {
-        match self {
-            FeeAmount::Custom => 100,
-            FeeAmount::Low => 500,
-            FeeAmount::Medium => 3000,
-            FeeAmount::High => 10000,
-            FeeAmount::Other(amount, _) => *amount,
-        }
-    }
-
-    pub fn tick_spacing(&self) -> u32 {
-        match self {
-            FeeAmount::Custom => 2,
-            FeeAmount::Low => 10,
-            FeeAmount::Medium => 60,
-            FeeAmount::High => 200,
-            FeeAmount::Other(_, amount) => *amount,
-        }
-    }
-}
-
-#[allow(non_snake_case)]
-pub fn FACTORY_NAME() -> String {
-    YASFactory::default().name()
-}
 
 #[cfg(test)]
 mod constructor_tests {
+    use blockifier::test_utils::testing_context::{string_to_starkfelt, FeeAmount, FACTORY_NAME};
+
     use super::*;
 
     #[test]
@@ -81,7 +43,7 @@ mod constructor_tests {
 
         assert_eq!(
             call_info.execution.retdata.0,
-            vec![felt_to_starkfelt(Felt::from_hex(POOL_CLASS_HASH_CAN_NOT_BE_ZERO).unwrap())]
+            vec![string_to_starkfelt("pool class hash can not be zero").unwrap()]
         )
     }
 

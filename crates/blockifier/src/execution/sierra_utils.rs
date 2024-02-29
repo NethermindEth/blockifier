@@ -163,6 +163,10 @@ pub fn contract_address_to_felt(contract_address: ContractAddress) -> Felt {
     Felt::from_bytes_be_slice(contract_address.0.key().bytes())
 }
 
+pub fn contract_address_to_starkfelt(contract_address: ContractAddress) -> StarkFelt {
+    felt_to_starkfelt(contract_address_to_felt(contract_address))
+}
+
 pub fn contract_entrypoint_to_entrypoint_selector(
     entrypoint: &ContractEntryPoint,
 ) -> EntryPointSelector {

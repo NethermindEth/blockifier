@@ -66,6 +66,8 @@ pub const TEST_YAS_FAUCET_CONTRACT_CLASS_HASH: &str = "0x1013";
 pub const TEST_YAS_FACTORY_CONTRACT_CLASS_HASH: &str = "0x1014";
 pub const TEST_YAS_POOL_CONTRACT_CLASS_HASH: &str = "0x1015";
 
+pub const TEST_YAS_ROUTER_CONTRACT_CLASS_HASH: &str = "0x1016";
+
 // Paths.
 pub const ACCOUNT_CONTRACT_CAIRO1_PATH: &str =
     "./feature_contracts/cairo1/compiled/account_with_dummy_validate.casm.json";
@@ -104,6 +106,8 @@ pub const YAS_FACTORY_CONTRACT_PATH: &str =
     "./feature_contracts/yet-another-swap/target/dev/yas_core_YASFactory.contract_class.json";
 pub const YAS_POOL_CONTRACT_PATH: &str =
     "./feature_contracts/yet-another-swap/target/dev/yas_core_YASPool.contract_class.json";
+pub const YAS_ROUTER_CONTRACT_PATH: &str =
+    "./feature_contracts/yet-another-swap/target/dev/yas_core_YASRouter.contract_class.json";
 
 #[derive(Clone, Copy, Debug)]
 pub enum CairoVersion {

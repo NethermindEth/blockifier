@@ -1,24 +1,10 @@
 use blockifier::execution::sierra_utils::{contract_address_to_felt, felt_to_starkfelt};
 use blockifier::test_utils::testing_context::{
-    StateFactory, TestContext, YASERC20Factory, YASFaucetFactory, OTHER, OWNER, WALLET,
+    string_to_felt, TestContext, YASERC20Factory, YASFaucetFactory, FAUCET_NAME, OTHER, OWNER,
+    WALLET, YASERC20_NAME,
 };
 use starknet_api::hash::StarkFelt;
 use starknet_types_core::felt::Felt;
-
-pub const NOT_ALLOWED_TO_WITHDRAW: &str = "0x4e6f7420616c6c6f77656420746f207769746864726177";
-pub const THERE_IS_NOT_ENOUGH_BALANCE: &str =
-    "0x5468657265206973206e6f7420656e6f7567682062616c616e6365";
-pub const CALLER_IS_NOT_THE_OWNER: &str = "0x43616c6c6572206973206e6f7420746865206f776e6572";
-
-#[allow(non_snake_case)]
-fn FAUCET_NAME() -> String {
-    YASFaucetFactory::default().name()
-}
-
-#[allow(non_snake_case)]
-fn YASERC20_NAME() -> String {
-    YASERC20Factory::default().name()
-}
 
 fn setup() -> TestContext {
     let mut context = TestContext::new(YASERC20Factory::default()).with_caller(OWNER().into());
@@ -180,7 +166,7 @@ fn test_withdrawal_not_allowed_panic() {
 
     assert_eq!(
         context.call_entry_point(&FAUCET_NAME(), "faucet_mint", vec![]),
-        vec![Felt::from_hex(NOT_ALLOWED_TO_WITHDRAW).unwrap()]
+        vec![string_to_felt("Not allowed to withdraw").unwrap()]
     );
 
     assert_eq!(
@@ -199,7 +185,7 @@ fn test_insufficient_balance_panic() {
 
     assert_eq!(
         context.call_entry_point(&FAUCET_NAME(), "faucet_mint", vec![]),
-        vec![Felt::from_hex(THERE_IS_NOT_ENOUGH_BALANCE).unwrap()]
+        vec![string_to_felt("There is not enough balance").unwrap()]
     );
 }
 
@@ -227,7 +213,7 @@ fn test_owner_withdrawal_panic() {
 
     assert_eq!(
         context.call_entry_point(&FAUCET_NAME(), "withdraw_all_balance", vec![OTHER().into()]),
-        vec![Felt::from_hex(CALLER_IS_NOT_THE_OWNER).unwrap()]
+        vec![string_to_felt("Caller is not the owner").unwrap()]
     );
 
     assert_eq!(
