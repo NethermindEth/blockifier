@@ -373,60 +373,85 @@ fn verify_compiler_version(contract: FeatureContract, expected_version: &str) {
 }
 
 #[test_case(
+    FeatureContract::SierraTestContract,
     ExecutionMode::Validate,
     TransactionVersion::ONE,
-    false,
+    false;
+    "Native. Validate execution mode: block info fields should be zeroed. Transaction V1.")]
+#[test_case(
+    FeatureContract::SierraTestContract,
+    ExecutionMode::Execute,
+    TransactionVersion::ONE,
+    false;
+    "Native. Execute execution mode: block info fields should be zeroed. Transaction V1.")]
+#[test_case(
+    FeatureContract::SierraTestContract,
+    ExecutionMode::Validate,
+    TransactionVersion::THREE,
+    false;
+    "Native. Validate execution mode: block info fields should be zeroed. Transaction V3.")]
+#[test_case(
+    FeatureContract::SierraTestContract,
+    ExecutionMode::Execute,
+    TransactionVersion::THREE,
+    false;
+    "Native. Execute execution mode: block info fields should be zeroed. Transaction V3.")]
+#[test_case(
+    FeatureContract::SierraTestContract,
+    ExecutionMode::Execute,
+    TransactionVersion::THREE,
+    true;
+    "Native. Execute execution mode: block info should be as usual. Transaction V3. Query.")]
+#[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    ExecutionMode::Validate,
+    TransactionVersion::ONE,
     false;
     "Validate execution mode: block info fields should be zeroed. Transaction V1.")]
 #[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
     ExecutionMode::Execute,
     TransactionVersion::ONE,
-    false,
     false;
-    "Execute execution mode: block info should be as usual. Transaction V1.")]
+    "Execute execution mode: block info fields should be zeroed. Transaction V1.")]
 #[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
     ExecutionMode::Validate,
     TransactionVersion::THREE,
-    false,
     false;
     "Validate execution mode: block info fields should be zeroed. Transaction V3.")]
 #[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
     ExecutionMode::Execute,
     TransactionVersion::THREE,
-    false,
     false;
-    "Execute execution mode: block info should be as usual. Transaction V3.")]
+    "Execute execution mode: block info fields should be zeroed. Transaction V3.")]
 #[test_case(
+    FeatureContract::TestContract(CairoVersion::Cairo1),
+    ExecutionMode::Execute,
+    TransactionVersion::THREE,
+    true;
+    "Execute execution mode: block info should be as usual. Transaction V3. Query.")]
+#[test_case(
+    FeatureContract::LegacyTestContract,
     ExecutionMode::Execute,
     TransactionVersion::ONE,
-    true,
     false;
     "Legacy contract. Execute execution mode: block info should be as usual. Transaction V1.")]
 #[test_case(
+    FeatureContract::LegacyTestContract,
     ExecutionMode::Execute,
     TransactionVersion::THREE,
-    true,
     false;
     "Legacy contract. Execute execution mode: block info should be as usual. Transaction V3.")]
-#[test_case(
-    ExecutionMode::Execute,
-    TransactionVersion::THREE,
-    false,
-    true;
-    "Execute execution mode: block info should be as usual. Transaction V3. Query.")]
-fn test_get_execution_info(
+fn test_get_execution_info2(
+    test_contract: FeatureContract,
     execution_mode: ExecutionMode,
     mut version: TransactionVersion,
-    is_legacy: bool,
     only_query: bool,
 ) {
-    let legacy_contract = FeatureContract::LegacyTestContract;
-    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo1);
-    let state = &mut test_state(
-        &ChainInfo::create_for_testing(),
-        BALANCE,
-        &[(legacy_contract, 1), (test_contract, 1)],
-    );
+    let state = &mut test_state(&ChainInfo::create_for_testing(), BALANCE, &[(test_contract, 1)]);
+
     let expected_block_info = match execution_mode {
         ExecutionMode::Validate => [
             // Rounded block number.
@@ -442,20 +467,25 @@ fn test_get_execution_info(
         ],
     };
 
-    let (test_contract_address, expected_unsupported_fields) = if is_legacy {
-        verify_compiler_version(legacy_contract, "2.1.0");
-        (legacy_contract.get_instance_address(0), vec![])
-    } else {
-        (
-            test_contract.get_instance_address(0),
-            vec![
-                StarkFelt::ZERO, // Tip.
-                StarkFelt::ZERO, // Paymaster data.
-                StarkFelt::ZERO, // Nonce DA.
-                StarkFelt::ZERO, // Fee DA.
-                StarkFelt::ZERO, // Account data.
-            ],
-        )
+    let (test_contract_address, expected_unsupported_fields) = match test_contract {
+        FeatureContract::LegacyTestContract => {
+            verify_compiler_version(test_contract, "2.1.0");
+            (test_contract.get_instance_address(0), vec![])
+        }
+        FeatureContract::SierraTestContract
+        | FeatureContract::TestContract(CairoVersion::Cairo1) => {
+            (
+                test_contract.get_instance_address(0),
+                vec![
+                    StarkFelt::ZERO, // Tip.
+                    StarkFelt::ZERO, // Paymaster data.
+                    StarkFelt::ZERO, // Nonce DA.
+                    StarkFelt::ZERO, // Fee DA.
+                    StarkFelt::ZERO, // Account data.
+                ],
+            )
+        }
+        _ => panic!("unexpected feature contract"),
     };
 
     if only_query {
@@ -482,7 +512,7 @@ fn test_get_execution_info(
             stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
             nonce.0,                                                    // Nonce.
         ];
-        if !is_legacy {
+        if !matches!(test_contract, FeatureContract::LegacyTestContract) {
             expected_resource_bounds = vec![
                 stark_felt!(0_u16), // Length of resource bounds array.
             ];
@@ -510,7 +540,7 @@ fn test_get_execution_info(
             stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
             nonce.0,                                                    // Nonce.
         ];
-        if !is_legacy {
+        if !matches!(test_contract, FeatureContract::LegacyTestContract) {
             expected_resource_bounds = vec![
                 StarkFelt::from(2u32),             // Length of ResourceBounds array.
                 stark_felt!(L1_GAS),               // Resource.
@@ -575,7 +605,6 @@ fn test_get_execution_info(
         ),
         ..trivial_external_entry_point()
     };
-
     let result = match execution_mode {
         ExecutionMode::Validate => {
             entry_point_call.execute_directly_given_tx_info_in_validate_mode(state, tx_info, false)
