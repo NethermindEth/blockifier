@@ -35,11 +35,11 @@ pub mod hint_processor;
 mod secp;
 
 #[cfg(test)]
+#[path = "syscall_tests.rs"]
+pub mod syscall_tests;
+#[cfg(test)]
 #[path = "syscall_tests_vm.rs"]
 mod syscall_tests_vm;
-#[cfg(test)]
-#[path = "syscalls_test.rs"]
-pub mod syscalls_test;
 
 pub type SyscallResult<T> = Result<T, SyscallExecutionError>;
 pub type WriteResponseResult = SyscallResult<()>;
@@ -688,10 +688,8 @@ pub fn keccak(
 
     if remainder != 0 {
         return Err(SyscallExecutionError::SyscallError {
-            error_data: vec![
-                StarkFelt::try_from(INVALID_INPUT_LENGTH_ERROR)
-                    .map_err(SyscallExecutionError::from)?,
-            ],
+            error_data: vec![StarkFelt::try_from(INVALID_INPUT_LENGTH_ERROR)
+                .map_err(SyscallExecutionError::from)?],
         });
     }
 
