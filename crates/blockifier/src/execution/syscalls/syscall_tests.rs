@@ -191,7 +191,8 @@ fn test_call_contract(
     assert_consistent_contract_version(inner_contract, &state);
 }
 
-#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // fails on negative flow data length exceeding limit. Might be worth splitting this test into four, one for each case, rather than having it all in one
+#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
+// fails on negative flow data length exceeding limit. Might be worth splitting this test into four, one for each case, rather than having it all in one
 #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 82930; "VM")] // passes
 fn test_emit_event(test_contract: FeatureContract, expected_gas: u64) {
     let versioned_constants = VersionedConstants::create_for_testing();
@@ -680,7 +681,8 @@ fn test_library_call_assert_fails(test_contract: FeatureContract, expected_gas: 
     );
 }
 
-#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] //fail, test specifies vm specific resource use, but also the inner_calls field is empty where it shouldn't be
+#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
+//fail, test specifies vm specific resource use, but also the inner_calls field is empty where it shouldn't be
 #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 316180; "VM")] // pass
 fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
@@ -802,7 +804,8 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
 }
 
 #[test]
-fn test_replace_class() { // pass, but needs splitting into vm and native with asserts added that the right one is being used
+fn test_replace_class() {
+    // pass, but needs splitting into vm and native with asserts added that the right one is being used
     let mut state = create_deploy_test_state();
 
     // Negative flow.
