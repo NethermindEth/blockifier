@@ -50,7 +50,7 @@ serde = "1.0.184"
 serde_json = "1.0.81"
 sha3 = "0.10.6"
 starknet-crypto = "0.5.1"
-starknet_api = "0.8.0"
+starknet_api = "0.10.0-dev.3"
 starknet-types-core = { version = "0.0.9", default-features = false, features = [
   "serde",
 ] }
