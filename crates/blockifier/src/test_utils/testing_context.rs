@@ -6,6 +6,7 @@ mod test_event;
 mod yas_erc20_factory;
 mod yas_factory;
 mod yas_faucet_factory;
+mod yas_pool;
 mod yas_router;
 mod yas_test_fixtures;
 
@@ -26,6 +27,7 @@ pub use test_event::*;
 pub use yas_erc20_factory::*;
 pub use yas_factory::*;
 pub use yas_faucet_factory::*;
+pub use yas_pool::*;
 pub use yas_router::*;
 pub use yas_test_fixtures::*;
 
@@ -73,7 +75,16 @@ impl TestContext {
         let (contract_address, call_info) = factory.create_state(&mut state);
 
         if call_info.execution.failed {
-            panic!("Failed to deploy contract");
+            panic!(
+                "Failed to deploy contract {}",
+                call_info
+                    .execution
+                    .retdata
+                    .0
+                    .first()
+                    .map(|e| e.to_string())
+                    .unwrap_or("".to_string())
+            );
         }
 
         // get type name of factory

@@ -1,0 +1,22 @@
+[package]
+name = "cairo_serde_macro"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+license-file.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+cairo_serde = { path = "../cairo_serde" }
+syn = "2.0.48"
+quote = "1.0.35"
+proc-macro2 = "1.0.78"
+
+[dev-dependencies]
+starknet_api.workspace = true
+starknet-types-core.workspace = true

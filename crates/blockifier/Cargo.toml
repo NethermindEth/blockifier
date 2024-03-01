@@ -49,6 +49,8 @@ thiserror.workspace = true
 phf.workspace = true
 ctor.workspace = true
 hex = "0.4.3"
+cairo_serde = { path = "../cairo_serde" }
+cairo_serde_macro = { path = "../cairo_serde_macro" }
 
 [dev-dependencies]
 assert_matches.workspace = true

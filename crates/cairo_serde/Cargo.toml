@@ -1,0 +1,11 @@
+[package]
+name = "cairo_serde"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+license-file.workspace = true
+
+[dependencies]
+starknet_api.workspace = true
+starknet-types-core.workspace = true

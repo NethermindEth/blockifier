@@ -443,6 +443,8 @@ dependencies = [
  "cairo-lang-utils",
  "cairo-native",
  "cairo-vm",
+ "cairo_serde",
+ "cairo_serde_macro",
  "ctor",
  "derive_more",
  "hex",
@@ -1053,6 +1055,26 @@ dependencies = [
  "starknet-crypto 0.6.1",
  "starknet-curve 0.4.0",
  "thiserror-no-std",
+]
+
+[[package]]
+name = "cairo_serde"
+version = "0.4.0"
+dependencies = [
+ "starknet-types-core",
+ "starknet_api",
+]
+
+[[package]]
+name = "cairo_serde_macro"
+version = "0.4.0"
+dependencies = [
+ "cairo_serde",
+ "proc-macro2",
+ "quote",
+ "starknet-types-core",
+ "starknet_api",
+ "syn 2.0.48",
 ]
 
 [[package]]
