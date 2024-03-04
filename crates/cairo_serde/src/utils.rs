@@ -1,3 +1,4 @@
+use primitive_types::U256;
 use starknet_api::hash::StarkFelt;
 use starknet_types_core::felt::{Felt, FromStrError};
 
@@ -19,4 +20,22 @@ pub fn string_to_hex_with_prefix(s: &str) -> String {
         hex.push_str(&format!("{:02x}", c as u8));
     }
     hex
+}
+
+pub fn get_hi_lo_from_u256(value: U256) -> (u128, u128) {
+    let [a, b, c, d] = value.0;
+
+    let full_vec = a
+        .to_le_bytes()
+        .iter()
+        .chain(b.to_le_bytes().iter())
+        .chain(c.to_le_bytes().iter())
+        .chain(d.to_le_bytes().iter())
+        .map(|e| *e)
+        .collect::<Vec<_>>();
+
+    let hi = u128::from_le_bytes(full_vec[16..32].try_into().unwrap());
+    let lo = u128::from_le_bytes(full_vec[0..16].try_into().unwrap());
+
+    (hi, lo)
 }

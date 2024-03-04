@@ -1,22 +1,59 @@
 use blockifier::execution::contract_class::SierraContractClassV1;
 use blockifier::execution::sierra_utils::{contract_address_to_starkfelt, felt_to_starkfelt};
+use blockifier::s_calldata_starkfelt;
 use blockifier::test_utils::testing_context::{
-    FeeAmount, Signers, StateFactory, TestContext, YASERC20Factory, YASFactory, YASPoolFactory,
-    YASRouterFactory, FACTORY_NAME, OWNER, WALLET,
+    FeeAmount, FixedType, Signers, StateFactory, TestContext, YASERC20Factory, YASFactory,
+    YASPoolFactory, YASRouterFactory, YasU256, FACTORY_NAME, OWNER, WALLET,
 };
 use blockifier::test_utils::{TEST_YAS_POOL_CONTRACT_CLASS_HASH, YAS_POOL_CONTRACT_PATH};
-use cairo_felt::Felt252;
-use num_integer::Integer;
+use cairo_serde::get_hi_lo_from_u256;
+use num_traits::ToPrimitive;
+use primitive_types::U256;
 use starknet_api::class_hash;
 use starknet_api::core::{ClassHash, ContractAddress, PatriciaKey};
 use starknet_api::hash::{StarkFelt, StarkHash};
 use starknet_types_core::felt::Felt;
 
 const MINT_AMOUNT: u128 = 1000000000000000000000000u128;
+// const MAX_SQRT_RATIO_HI = 4295128739u128;
+
 // 1461446703485210103287273052203988822378723970342
 // const MAX_SQRT_RATIO_LO = 1461446703485210103287273052203988822378723970342u128;
 // 4295128739
-// const MAX_SQRT_RATIO_HI = 4295128739u128;
+pub const MIN_TICK: i32 = -887272;
+pub const MAX_TICK: i32 = 887272;
+pub const MIN_SQRT_RATIO: u128 = 4295128739;
+
+// /// The maximum value that can be returned from `get_sqrt_ratio_at_tick`. Equivalent to
+// get_sqrt_ratio_at_tick(MAX_TICK). const MAX_SQRT_RATIO: u256 =
+// 1461446703485210103287273052203988822378723970342;
+pub fn get_yas_u256_from_str(num: &str) -> YasU256 {
+    let num_parsed = U256::from_dec_str(num).unwrap();
+
+    let (hi, lo) = get_hi_lo_from_u256(num_parsed);
+
+    YasU256 { lo, hi }
+}
+
+pub fn get_u256_from_str(num: &str) -> U256 {
+    U256::from_dec_str(num).unwrap()
+}
+
+pub fn min_tick(tick_spacing: i32) -> i32 {
+    (MIN_TICK / tick_spacing) * tick_spacing
+}
+
+pub fn max_tick(tick_spacing: i32) -> i32 {
+    (MAX_TICK / tick_spacing) * tick_spacing
+}
+
+fn encode_price_sqrt_1_2() -> FixedType {
+    FixedType::from_u128(56022770974786139918731938227u128)
+}
+
+pub fn max_sqrt_ratio() -> U256 {
+    get_u256_from_str("1461446703485210103287273052203988822378723970342")
+}
 
 fn token_0_factory() -> YASERC20Factory<'static> {
     YASERC20Factory::new(Some("YAS0"), Some("$YAS0"), Some(Felt::from(MINT_AMOUNT)), Some(OWNER()))
@@ -137,7 +174,7 @@ fn init_pool(context: &mut TestContext) {
     let result = context.call_entry_point(
         &yas_pool(),
         "initialize",
-        vec![encode_price_sqrt_1_10(), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+        s_calldata_starkfelt!(encode_price_sqrt_1_10()),
     );
 
     assert_eq!(result, vec![]);
@@ -163,9 +200,20 @@ fn init_pool(context: &mut TestContext) {
     assert_eq!(result, vec![]);
 }
 
-fn setup_with_pool() -> TestContext {
-    let mut context = setup();
-    init_pool(&mut context);
+fn deploy_only_pool() -> TestContext {
+    let mut context = TestContext::new_empty();
+
+    context.add_manual_class_hash(
+        class_hash!(TEST_YAS_POOL_CONTRACT_CLASS_HASH),
+        SierraContractClassV1::from_file(YAS_POOL_CONTRACT_PATH).into(),
+    );
+
+    context.add_manual_contract(
+        yas_pool(),
+        ContractAddress::from(10230129302481021u128),
+        class_hash!(TEST_YAS_POOL_CONTRACT_CLASS_HASH),
+    );
+
     context
 }
 
@@ -193,26 +241,13 @@ fn YAS_POOL_FACTORY_NAME() -> String {
     .name()
 }
 
-fn deploy_only_pool() -> TestContext {
-    let context = TestContext::new(YASPoolFactory::new(vec![
-        MOCK_FACTORY_ADDRESS().into(),
-        MOCK_TOKEN_1_ADDRESS().into(),
-        MOCK_TOKEN_2_ADDRESS().into(),
-        Felt::from(FeeAmount::Medium.fee_amount()),
-        Felt::from(FeeAmount::Medium.tick_spacing()),
-        Felt::from(0u8),
-    ]));
-
-    context
-}
-
-fn encode_price_sqrt_1_10() -> StarkFelt {
+fn encode_price_sqrt_1_10() -> FixedType {
     // // returns result of encode_price_sqrt(1, 10) on v3-core typescript impl.
     // fn encode_price_sqrt_1_10() -> FixedType {
     //     FP64x96Impl::new(25054144837504793118641380156, false)
     // }
 
-    StarkFelt::from_u128(25054144837504793118641380156)
+    FixedType::from_u128(25054144837504793118641380156u128)
 }
 
 fn get_min_tick_and_max_tick() -> (i32, i32) {
@@ -231,23 +266,20 @@ fn get_min_tick_and_max_tick() -> (i32, i32) {
     (min_tick, max_tick)
 }
 
-pub const MIN_TICK: i32 = -887272;
-pub const MAX_TICK: i32 = 887272;
-
 #[cfg(test)]
 mod constructor_tests {
     use super::*;
 
     #[test]
     fn deploys() {
-        let _ = setup_with_pool();
+        // let _ = setup_with_pool();
     }
 }
-pub const MIN_SQRT_RATIO: u128 = 4295128739;
-
 #[cfg(test)]
 mod initialize_tests {
-    use blockifier::test_utils::testing_context::string_to_felt;
+    use blockifier::test_utils::testing_context::{string_to_felt, FixedType, YasI32};
+    use blockifier::{s_calldata, s_calldata_felt, s_calldata_starkfelt};
+    use cairo_serde::traits::CairoSerializable;
 
     use super::*;
 
@@ -258,7 +290,7 @@ mod initialize_tests {
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![encode_price_sqrt_1_10(), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(encode_price_sqrt_1_10()),
         );
 
         assert_eq!(result, vec![]);
@@ -266,7 +298,7 @@ mod initialize_tests {
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![encode_price_sqrt_1_10(), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(encode_price_sqrt_1_10()),
         );
 
         assert_eq!(result, vec![string_to_felt("AI").unwrap()]);
@@ -279,7 +311,7 @@ mod initialize_tests {
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![StarkFelt::from(1u128), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(FixedType::from_u128(1)),
         );
 
         assert_eq!(result, vec![string_to_felt("R").unwrap()]);
@@ -292,23 +324,12 @@ mod initialize_tests {
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![StarkFelt::from(MIN_SQRT_RATIO - 1), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(FixedType::from_u128(MIN_SQRT_RATIO - 1)),
         );
 
         assert_eq!(result, vec![string_to_felt("R").unwrap()]);
     }
 
-    // #[test]
-    // #[available_gas(200000000)]
-    // #[should_panic(expected: ('R', 'ENTRYPOINT_FAILED'))]
-    // fn test_fails_if_price_is_too_high() {
-    //     let yas_pool = deploy(
-    //         FACTORY_ADDRESS(), TOKEN_A(), TOKEN_B(), 5, IntegerTrait::<i32>::new(1, false)
-    //     );
-    //
-    //     let sqrt_price_X96 = FixedTrait::new(pow(2, 160) - 1, false);
-    //     yas_pool.initialize(sqrt_price_X96);
-    // }
     #[test]
     fn test_fails_if_price_is_too_high() {
         let mut context = deploy_only_pool();
@@ -316,82 +337,110 @@ mod initialize_tests {
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![StarkFelt::from(0u8), StarkFelt::from(2u128.pow(160 - 128)), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(FixedType::from_u256(U256::from(2).pow(U256::from(160)) - 1)),
         );
 
         assert_eq!(result, vec![string_to_felt("R").unwrap()]);
     }
 
-    // #[test]
-    // #[available_gas(200000000)]
-    // #[should_panic(expected: ('R', 'ENTRYPOINT_FAILED'))]
-    // fn test_fails_if_price_is_max_sqrt_ratio() {
-    //     let yas_pool = deploy(
-    //         FACTORY_ADDRESS(), TOKEN_A(), TOKEN_B(), 5, IntegerTrait::<i32>::new(1, false)
-    //     );
-    //
-    //     let sqrt_price_X96 = FixedTrait::new(MAX_SQRT_RATIO, false);
-    //     yas_pool.initialize(sqrt_price_X96);
-    // }
     #[test]
     fn test_fails_if_price_is_max_sqrt_ratio() {
-        todo!("Implement test_fails_if_price_is_max_sqrt_ratio");
-        // let mut context = deploy_only_pool();
-        //
-        // let result = context.call_entry_point(
-        //     &yas_pool(),
-        //     "initialize",
-        //     vec![StarkFelt::from(MAX_SQRT_RATIO), StarkFelt::from(0u8), StarkFelt::from(0u8)],
-        // )
-        //;
-    }
-
-    // #[test]
-    // #[available_gas(200000000)]
-    // fn test_can_be_initialized_at_min_sqrt_ratio() {
-    //     let mut state = STATE();
-    //
-    //     let sqrt_price_X96 = FixedTrait::new(MIN_SQRT_RATIO, false);
-    //     YASPoolImpl::initialize(ref state, sqrt_price_X96);
-    //
-    //     let expected = Slot0 {
-    //         sqrt_price_X96: FixedTrait::new(MIN_SQRT_RATIO, false),
-    //         tick: min_tick(IntegerTrait::<i32>::new(1, false)),
-    //         fee_protocol: 0
-    //     };
-    //
-    //     assert(InternalImpl::get_slot_0(@state) == expected, 'slot 0 wrong initialization');
-    // }
-    #[test]
-    fn test_can_be_initialized_at_min_sqrt_ratio() {
         let mut context = deploy_only_pool();
 
         let result = context.call_entry_point(
             &yas_pool(),
             "initialize",
-            vec![StarkFelt::from(MIN_SQRT_RATIO), StarkFelt::from(0u8), StarkFelt::from(0u8)],
+            s_calldata_starkfelt!(FixedType::from_u256(max_sqrt_ratio())),
+        );
+
+        assert_eq!(result, vec![string_to_felt("R").unwrap()]);
+    }
+
+    #[test]
+    fn test_can_be_initialized_at_min_sqrt_ratio() {
+        let mut context = deploy_only_pool();
+
+        let sqrt_price_x96 = FixedType::from_u128(MIN_SQRT_RATIO);
+
+        let result = context.call_entry_point(
+            &yas_pool(),
+            "initialize",
+            s_calldata_starkfelt!(sqrt_price_x96),
         );
 
         assert_eq!(result, vec![]);
 
         let result = context.call_entry_point(&yas_pool(), "get_slot_0", vec![]);
 
-        println!("Result : {:?}", result);
+        assert_eq!(
+            result,
+            s_calldata_felt!(
+                FixedType::from_u128(MIN_SQRT_RATIO),
+                YasI32::from_i32(min_tick(1)),
+                0u8
+            )
+        );
+    }
+
+    #[test]
+    fn test_can_be_initialized_at_max_sqrt_ratio_minus_1() {
+        let mut context = deploy_only_pool();
+
+        let sqrt_price_x96 = FixedType::from_u256(max_sqrt_ratio() - 1);
+
+        let result = context.call_entry_point(
+            &yas_pool(),
+            "initialize",
+            s_calldata_starkfelt!(sqrt_price_x96),
+        );
+
+        assert_eq!(result, vec![]);
+
+        let result = context.call_entry_point(&yas_pool(), "get_slot_0", vec![]);
 
         assert_eq!(
             result,
-            vec![
-                Felt::from(MIN_SQRT_RATIO),
-                Felt::from(0u8),
-                Felt::from(0u8),
-                // Felt::from(0u8),
-                Felt::from(MIN_TICK),
-                Felt::from(0u8),
-                Felt::from(0u8),
-            ]
+            s_calldata_felt!(sqrt_price_x96, YasI32::from_i32(max_tick(1) - 1), 0u128)
         );
     }
-}
-pub fn min_tick(tick_spacing: i32) -> i32 {
-    (MIN_TICK / tick_spacing) * tick_spacing
+
+    #[test]
+    fn test_sets_initial_variables() {
+        let mut context = deploy_only_pool();
+
+        let result = context.call_entry_point(
+            &yas_pool(),
+            "initialize",
+            s_calldata_starkfelt!(encode_price_sqrt_1_2()),
+        );
+
+        assert_eq!(result, vec![]);
+
+        let result = context.call_entry_point(&yas_pool(), "get_slot_0", vec![]);
+
+        assert_eq!(
+            result,
+            s_calldata_felt!(encode_price_sqrt_1_2(), YasI32::from_i32(-6932), 0u128)
+        );
+    }
+
+    #[test]
+    fn test_emits_an_initialized_event() {
+        let mut context = deploy_only_pool();
+
+        let sqrt_price_x96 = encode_price_sqrt_1_2();
+        let tick = YasI32::from_i32(-6932);
+
+        let result = context.call_entry_point(
+            &yas_pool(),
+            "initialize",
+            s_calldata_starkfelt!(sqrt_price_x96),
+        );
+
+        assert_eq!(result, vec![]);
+
+        let event = context.get_event(0).unwrap();
+
+        assert_eq!(event.data, s_calldata_felt!(sqrt_price_x96, tick));
+    }
 }

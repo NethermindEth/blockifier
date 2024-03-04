@@ -9,3 +9,4 @@ license-file.workspace = true
 [dependencies]
 starknet_api.workspace = true
 starknet-types-core.workspace = true
+primitive-types.workspace = true

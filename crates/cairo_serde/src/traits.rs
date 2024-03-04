@@ -1,9 +1,10 @@
+use primitive_types::U256;
 use starknet_api::hash::StarkFelt;
 use starknet_types_core::felt::Felt;
 
 use crate::utils::{felt_to_starkfelt, starkfelt_to_felt, string_to_felt};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum UniversalFelt {
     Felt(Felt),
     StarkFelt(StarkFelt),
@@ -135,5 +136,12 @@ impl CairoSerializable for StarkFelt {
 impl CairoSerializable for Felt {
     fn serialize_cairo(&self) -> Vec<UniversalFelt> {
         vec![(*self).into()]
+    }
+}
+
+impl CairoSerializable for U256 {
+    fn serialize_cairo(&self) -> Vec<UniversalFelt> {
+        let (hi, lo) = crate::utils::get_hi_lo_from_u256(*self);
+        vec![Felt::from(lo).into(), Felt::from(hi).into()]
     }
 }

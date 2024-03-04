@@ -1,3 +1,4 @@
+mod calldata_macro;
 mod erc20_factory;
 mod signers;
 mod state_factory;
@@ -8,12 +9,14 @@ mod yas_factory;
 mod yas_faucet_factory;
 mod yas_pool;
 mod yas_router;
+mod yas_structs;
 mod yas_test_fixtures;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use cairo_native::starknet::SyscallResult;
+pub use calldata_macro::*;
 pub use erc20_factory::*;
 pub use signers::*;
 use starknet_api::block::BlockTimestamp;
@@ -29,6 +32,7 @@ pub use yas_factory::*;
 pub use yas_faucet_factory::*;
 pub use yas_pool::*;
 pub use yas_router::*;
+pub use yas_structs::*;
 pub use yas_test_fixtures::*;
 
 use crate::abi::abi_utils::selector_from_name;
@@ -113,6 +117,16 @@ impl TestContext {
         )
     }
 
+    pub fn new_empty() -> Self {
+        Self {
+            contract_addresses: HashMap::new(),
+            state: create_custom_deploy_test_state(vec![], vec![]),
+            caller_address: Signers::Alice.into(),
+            events: vec![],
+            block_context: BlockContext::create_for_testing(),
+        }
+    }
+
     pub fn with_caller(mut self, caller_address: ContractAddress) -> Self {
         self.caller_address = caller_address;
 
@@ -147,6 +161,16 @@ impl TestContext {
 
     pub fn add_manual_class_hash(&mut self, class_hash: ClassHash, contract_class: ContractClass) {
         self.state.state.class_hash_to_class.insert(class_hash, contract_class);
+    }
+
+    pub fn add_manual_contract(
+        &mut self,
+        contract_name: String,
+        contract_address: ContractAddress,
+        class_hash: ClassHash,
+    ) {
+        self.contract_addresses.insert(contract_name, contract_address);
+        self.state.state.address_to_class_hash.insert(contract_address, class_hash);
     }
 
     pub fn call_entry_point(
