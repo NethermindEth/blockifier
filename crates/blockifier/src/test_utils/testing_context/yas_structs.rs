@@ -1,6 +1,7 @@
 use cairo_serde::get_hi_lo_from_u256;
 use cairo_serde_macro::CairoSerde;
 use primitive_types::U256;
+use starknet_types_core::felt::Felt;
 
 #[derive(Debug, Copy, Clone, Default, CairoSerde)]
 pub struct YasU256 {

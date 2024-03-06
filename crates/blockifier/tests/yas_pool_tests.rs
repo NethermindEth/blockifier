@@ -1,11 +1,11 @@
 use blockifier::execution::contract_class::SierraContractClassV1;
 use blockifier::execution::sierra_utils::{contract_address_to_starkfelt, felt_to_starkfelt};
-use blockifier::s_calldata_starkfelt;
 use blockifier::test_utils::testing_context::{
     FeeAmount, FixedType, Signers, StateFactory, TestContext, YASERC20Factory, YASFactory,
-    YASPoolFactory, YASRouterFactory, YasU256, FACTORY_NAME, OWNER, WALLET,
+    YASPoolFactory, YASRouterFactory, YasI32, YasU256, FACTORY_NAME, OWNER, WALLET,
 };
 use blockifier::test_utils::{TEST_YAS_POOL_CONTRACT_CLASS_HASH, YAS_POOL_CONTRACT_PATH};
+use blockifier::{s_calldata_felt, s_calldata_starkfelt};
 use cairo_serde::get_hi_lo_from_u256;
 use num_traits::ToPrimitive;
 use primitive_types::U256;
@@ -49,6 +49,10 @@ pub fn max_tick(tick_spacing: i32) -> i32 {
 
 fn encode_price_sqrt_1_2() -> FixedType {
     FixedType::from_u128(56022770974786139918731938227u128)
+}
+
+fn encode_price_sqrt_1_1() -> FixedType {
+    FixedType::from_u128(79228162514264337593543950336u128)
 }
 
 pub fn max_sqrt_ratio() -> U256 {
@@ -217,6 +221,25 @@ fn deploy_only_pool() -> TestContext {
     context
 }
 
+fn deploy(
+    factory: Signers,
+    token_0: Signers,
+    token_1: Signers,
+    fee: u32,
+    tick_spacing: YasI32,
+) -> TestContext {
+    let context = TestContext::new(YASPoolFactory::new(s_calldata_felt!(
+        factory.get_address(),
+        token_0.get_address(),
+        token_1.get_address(),
+        fee,
+        tick_spacing
+    )));
+
+    return context;
+}
+
+#[cfg(test)]
 fn MOCK_FACTORY_ADDRESS() -> Signers {
     Signers::Custom(ContractAddress::from(10230129302481021u128))
 }
@@ -442,5 +465,293 @@ mod initialize_tests {
         let event = context.get_event(0).unwrap();
 
         assert_eq!(event.data, s_calldata_felt!(sqrt_price_x96, tick));
+    }
+}
+
+// TODO: tests are not implemented because of mock_contract_states() function
+#[cfg(test)]
+pub mod update_position_tests {
+    #[test]
+    fn test_add_liquidity_when_call_update_position_then_position_is_updated() {
+        todo!("test_add_liquidity_when_call_update_position_then_position_is_updated")
+    }
+
+    #[test]
+    fn test_sub_liquidity_when_call_update_position_then_position_is_updated() {
+        todo!("test_sub_liquidity_when_call_update_position_then_position_is_updated")
+    }
+
+    #[test]
+    fn test_sub_liquidity_gt_available_when_call_update_position_should_panic() {
+        todo!("test_sub_liquidity_gt_available_when_call_update_position_should_panic")
+    }
+
+    #[test]
+    fn test_add_liquidity_gt_max_liq_when_call_update_position_should_panic() {
+        todo!("test_add_liquidity_gt_max_liq_when_call_update_position_should_panic")
+    }
+}
+
+#[cfg(test)]
+pub mod mint_tests {
+    use blockifier::test_utils::testing_context::{TOKEN_A, TOKEN_B};
+
+    use super::*;
+
+    #[test]
+    fn test_fails_not_initialized() {
+        let mut context = deploy(
+            MOCK_FACTORY_ADDRESS(),
+            TOKEN_A(),
+            TOKEN_B(),
+            FeeAmount::Medium.fee_amount(),
+            YasI32::from_i32(FeeAmount::Medium.tick_spacing() as i32),
+        );
+
+        let sqrt_price_x96 = encode_price_sqrt_1_1();
+
+        let (min_tick, max_tick) = get_min_tick_and_max_tick();
+
+        let yas_pool_address = context.contract_address(&yas_pool());
+
+        let result = context.call_entry_point(
+            &yas_pool(),
+            "mint",
+            s_calldata_starkfelt!(
+                yas_pool_address,
+                YasI32::from_i32(min_tick),
+                YasI32::from_i32(max_tick),
+                1u128,
+                Vec::<Felt>::new()
+            ),
+        );
+
+        println!("{:?}", result.first().unwrap().to_hex_string());
+
+        assert_eq!(result, s_calldata_felt!("LOK"));
+    }
+
+    mod failure_cases {
+        use super::*;
+
+        #[test]
+        fn test_fails_tick_lower_greater_than_tick_upper() {
+            let mut context = setup();
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    YasI32::from_i32(1),
+                    YasI32::from_i32(0),
+                    1u128
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("TLU"));
+        }
+
+        #[test]
+        fn test_fails_tick_lower_than_min() {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    YasI32::from_i32(MIN_TICK - 1),
+                    YasI32::from_i32(0),
+                    1u128
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("TLM"));
+        }
+
+        #[test]
+        fn test_fails_tick_greater_than_max() {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    YasI32::from_i32(0),
+                    YasI32::from_i32(MAX_TICK + 1),
+                    1u128
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("TUM"));
+        }
+
+        #[test]
+        fn test_fails_amount_exceeds_the_max() {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let max_liquidity_per_tick =
+                context.call_entry_point(&yas_pool(), "get_max_liquidity_per_tick", vec![]);
+            let max_liquidity_per_tick = max_liquidity_per_tick.first().unwrap();
+
+            let tick_spacing = context.call_entry_point(&yas_pool(), "get_tick_spacing", vec![]);
+            let tick_spacing = tick_spacing.first().unwrap();
+
+            let (min_tick, max_tick) = get_min_tick_and_max_tick();
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    (Felt::from(min_tick.abs()) - tick_spacing),
+                    Felt::from(true),
+                    Felt::from(max_tick) - tick_spacing,
+                    Felt::from(false),
+                    max_liquidity_per_tick + Felt::from(1)
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("LO"));
+        }
+
+        #[test]
+        fn test_amount_max() {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let max_liquidity_gross =
+                context.call_entry_point(&yas_pool(), "get_max_liquidity_per_tick", vec![]);
+            let max_liquidity_gross = max_liquidity_gross.first().unwrap();
+
+            let tick_spacing = context.call_entry_point(&yas_pool(), "get_tick_spacing", vec![]);
+            let tick_spacing = tick_spacing.first().unwrap();
+
+            let (min_tick, max_tick) = get_min_tick_and_max_tick();
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    Felt::from(min_tick.abs()) - tick_spacing,
+                    true,
+                    Felt::from(max_tick) - tick_spacing,
+                    false,
+                    max_liquidity_gross
+                ),
+            );
+
+            println!("{:?}", result.first().unwrap().to_hex_string());
+
+            assert_eq!(result, vec![]);
+        }
+
+        #[test_case::test_case(1, 1, 1; "m_1_1_1")]
+        #[test_case::test_case(2, 1, 1; "m_2_1_1")]
+        #[test_case::test_case(1, 2, 1; "m_1_2_1")]
+        #[test_case::test_case(1, 1, 0; "m_1_2_0")]
+        fn test_fails_amount_at_tick_greater_than_max(
+            multiplier_a: u128,
+            multiplier_b: u128,
+            multiplier_c: u128,
+        ) {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+
+            let tick_spacing = context.call_entry_point(&yas_pool(), "get_tick_spacing", vec![]);
+            let tick_spacing = tick_spacing.first().unwrap();
+
+            let (min_tick, max_tick) = get_min_tick_and_max_tick();
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    Felt::from(min_tick.abs()) - tick_spacing,
+                    Felt::from(true),
+                    Felt::from(max_tick) - tick_spacing,
+                    Felt::from(false),
+                    Felt::from(1000)
+                ),
+            );
+
+            let max_liquidity_gross =
+                context.call_entry_point(&yas_pool(), "get_max_liquidity_per_tick", vec![]);
+            let max_liquidity_gross = max_liquidity_gross.first().unwrap();
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    Felt::from(min_tick.abs()) - tick_spacing * Felt::from(multiplier_a),
+                    Felt::from(true),
+                    Felt::from(max_tick) - tick_spacing * Felt::from(multiplier_b),
+                    Felt::from(false),
+                    max_liquidity_gross - Felt::from(1000u128) + Felt::from(1 * multiplier_c)
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("LO"));
+        }
+
+        #[test]
+        fn test_fails_amount_is_zero() {
+            let mut context = setup();
+
+            init_pool(&mut context);
+
+            let yas_pool_address = context.contract_address(&yas_pool());
+            let tick_spacing = context.call_entry_point(&yas_pool(), "get_tick_spacing", vec![]);
+            let tick_spacing = tick_spacing.first().unwrap();
+            let (min_tick, max_tick) = get_min_tick_and_max_tick();
+
+            let result = context.call_entry_point(
+                &yas_router(),
+                "mint",
+                s_calldata_starkfelt!(
+                    yas_pool_address,
+                    WALLET(),
+                    Felt::from(min_tick.abs()) - tick_spacing,
+                    Felt::from(true),
+                    Felt::from(max_tick) - tick_spacing,
+                    Felt::from(false),
+                    Felt::from(0u128)
+                ),
+            );
+
+            assert_eq!(result, s_calldata_felt!("amount must be greater than 0"));
+        }
     }
 }

@@ -1,3 +1,4 @@
+use cairo_serde::traits::{CairoSerializable, UniversalFelt};
 use starknet_api::core::{ContractAddress, PatriciaKey};
 use starknet_api::hash::{StarkFelt, StarkHash};
 use starknet_api::patricia_key;
@@ -21,6 +22,12 @@ impl Signers {
             Signers::Charlie => ContractAddress(patricia_key!(0x003u128)),
             Signers::Custom(address) => *address,
         }
+    }
+}
+
+impl CairoSerializable for Signers {
+    fn serialize_cairo(&self) -> Vec<UniversalFelt> {
+        self.get_address().serialize_cairo()
     }
 }
 

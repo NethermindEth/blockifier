@@ -1,4 +1,5 @@
 use primitive_types::U256;
+use starknet_api::core::ContractAddress;
 use starknet_api::hash::StarkFelt;
 use starknet_types_core::felt::{Felt, FromStrError};
 
@@ -38,4 +39,8 @@ pub fn get_hi_lo_from_u256(value: U256) -> (u128, u128) {
     let lo = u128::from_le_bytes(full_vec[0..16].try_into().unwrap());
 
     (hi, lo)
+}
+
+pub fn contract_address_to_felt(contract_address: ContractAddress) -> Felt {
+    Felt::from_bytes_be_slice(contract_address.0.key().bytes())
 }
