@@ -37,6 +37,9 @@ impl YasI32 {
     pub fn from_i32(value: i32) -> Self {
         Self { value: value.abs() as u32, sign: value < 0 }
     }
+    pub fn from_u32(value: u32) -> Self {
+        Self { value, sign: false }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Default, CairoSerde)]
