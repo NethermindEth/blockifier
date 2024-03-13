@@ -307,63 +307,6 @@ mod test_emit_event {
     }
 }
 
-//#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
-//// fails on negative flow data length exceeding limit. Might be worth splitting this test into four, one for each case, rather than having it all in one
-//#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 82930; "VM")] // passes
-//fn test_emit_event2(test_contract: FeatureContract, expected_gas: u64) {
-//    let versioned_constants = VersionedConstants::create_for_testing();
-//    // Positive flow.
-//    let keys = vec![stark_felt!(2019_u16), stark_felt!(2020_u16)];
-//    let data = vec![stark_felt!(2021_u16), stark_felt!(2022_u16), stark_felt!(2023_u16)];
-//    // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion works.
-//    let n_emitted_events = vec![stark_felt!(1_u16)];
-//    let call_info = emit_events(test_contract, &n_emitted_events, &keys, &data).unwrap();
-//    let event = EventContent {
-//        keys: keys.clone().into_iter().map(EventKey).collect(),
-//        data: EventData(data.clone()),
-//    };
-//    assert_eq!(
-//        call_info.execution,
-//        CallExecution {
-//            events: vec![OrderedEvent { order: 0, event }],
-//            gas_consumed: expected_gas,
-//            ..Default::default()
-//        }
-//    );
-//
-//    // Negative flow, the data length exceeds the limit.
-//    let max_event_data_length = versioned_constants.tx_event_limits.max_data_length;
-//    let data_too_long = vec![stark_felt!(2_u16); max_event_data_length + 1];
-//    let error = emit_events(test_contract, &n_emitted_events, &keys, &data_too_long).unwrap_err();
-//    let expected_error = EmitEventError::ExceedsMaxDataLength {
-//        data_length: max_event_data_length + 1,
-//        max_data_length: max_event_data_length,
-//    };
-//    assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
-//
-//    // Negative flow, the keys length exceeds the limit.
-//    let max_event_keys_length = versioned_constants.tx_event_limits.max_keys_length;
-//    let keys_too_long = vec![stark_felt!(1_u16); max_event_keys_length + 1];
-//    let error = emit_events(test_contract, &n_emitted_events, &keys_too_long, &data).unwrap_err();
-//    let expected_error = EmitEventError::ExceedsMaxKeysLength {
-//        keys_length: max_event_keys_length + 1,
-//        max_keys_length: max_event_keys_length,
-//    };
-//    assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
-//
-//    // Negative flow, the number of events exceeds the limit.
-//    let max_n_emitted_events = versioned_constants.tx_event_limits.max_n_emitted_events;
-//    let n_emitted_events_too_big = vec![stark_felt!(
-//        u16::try_from(max_n_emitted_events + 1).expect("Failed to convert usize to u16.")
-//    )];
-//    let error = emit_events(test_contract, &n_emitted_events_too_big, &keys, &data).unwrap_err();
-//    let expected_error = EmitEventError::ExceedsMaxNumberOfEmittedEvents {
-//        n_emitted_events: max_n_emitted_events + 1,
-//        max_n_emitted_events,
-//    };
-//    assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
-//}
-
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
 #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 14250; "VM")] // unauthorised syscall get_block_hash in execution mode Validate
 fn test_get_block_hash(test_contract: FeatureContract, expected_gas: u64) {
