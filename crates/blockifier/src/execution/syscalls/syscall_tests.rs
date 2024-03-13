@@ -233,7 +233,6 @@ mod test_emit_event {
             data_length: max_event_data_length + 1,
             max_data_length: max_event_data_length,
         };
-
         assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
     }
 
@@ -250,6 +249,7 @@ mod test_emit_event {
             keys_length: max_event_keys_length + 1,
             max_keys_length: max_event_keys_length,
         };
+
         assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
     }
 

@@ -204,10 +204,13 @@ pub fn run_native_executor(
     };
 
     match execution_result {
-        Ok(res) => Ok(res),
+        Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeExecutionError {
+            info: res.error_msg.unwrap_or(String::from("unknow error")),
+        }),
         Err(runner_err) => {
-            Err(EntryPointExecutionError::NativeExecutionError { source: runner_err })
+            Err(EntryPointExecutionError::NativeUnexpectedError { source: runner_err })
         }
+        Ok(res) => Ok(res),
     }
 }
 
@@ -238,4 +241,19 @@ pub fn create_callinfo(
         storage_read_values: vec![],
         accessed_storage_keys: HashSet::new(),
     })
+}
+
+pub fn encode_str_as_felts(msg: &str) -> Vec<Felt> {
+    const CHUNK_SIZE: usize = 32;
+
+    let data = msg.as_bytes();
+    let mut encoding = vec![Felt::default(); (data.len() / 32) + 1];
+    for i in 0..encoding.len() {
+        let mut chunk = [0_u8; CHUNK_SIZE];
+        let a = i * CHUNK_SIZE - i;
+        let b = ((i + 1) * CHUNK_SIZE - (i + 1)).min(data.len());
+        chunk[1..CHUNK_SIZE.min(b - a + 1)].copy_from_slice(&data[a..b]);
+        encoding[i] = Felt::from_bytes_be(&chunk);
+    }
+    encoding
 }
