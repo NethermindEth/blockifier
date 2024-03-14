@@ -866,7 +866,6 @@ mod test_replace_class2 {
             ..trivial_external_entry_point()
         };
         let error = entry_point_call.execute_directly(&mut state).unwrap_err().to_string();
-        dbg!(&error);
         assert!(error.contains("Cannot replace V1 class hash with V0 class hash"));
     }
 
