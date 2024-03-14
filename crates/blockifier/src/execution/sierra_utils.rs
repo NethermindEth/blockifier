@@ -205,7 +205,11 @@ pub fn run_native_executor(
 
     match execution_result {
         Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeExecutionError {
-            info: res.error_msg.unwrap_or(String::from("unknow error")),
+            info: if !res.return_values.is_empty() {
+                decode_felts_as_str(&res.return_values)
+            } else {
+                String::from("unknown error")
+            },
         }),
         Err(runner_err) => {
             Err(EntryPointExecutionError::NativeUnexpectedError { source: runner_err })
@@ -256,4 +260,11 @@ pub fn encode_str_as_felts(msg: &str) -> Vec<Felt> {
         encoding[i] = Felt::from_bytes_be(&chunk);
     }
     encoding
+}
+
+pub fn decode_felts_as_str(encoding: &[Felt]) -> String {
+    let bytes_err: Vec<_> =
+        encoding.iter().flat_map(|felt| felt.to_bytes_be()[1..32].to_vec()).collect();
+
+    String::from_utf8(bytes_err).unwrap().trim_end_matches('\0').to_owned()
 }
