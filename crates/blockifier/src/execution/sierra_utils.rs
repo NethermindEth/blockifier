@@ -250,13 +250,11 @@ pub fn create_callinfo(
 pub fn encode_str_as_felts(msg: &str) -> Vec<Felt> {
     const CHUNK_SIZE: usize = 32;
 
-    let data = msg.as_bytes();
-    let mut encoding = vec![Felt::default(); (data.len() / 32) + 1];
-    for i in 0..encoding.len() {
+    let data = msg.as_bytes().chunks(CHUNK_SIZE - 1);
+    let mut encoding = vec![Felt::default(); data.len()];
+    for (i, data_chunk) in data.enumerate() {
         let mut chunk = [0_u8; CHUNK_SIZE];
-        let a = i * CHUNK_SIZE - i;
-        let b = ((i + 1) * CHUNK_SIZE - (i + 1)).min(data.len());
-        chunk[1..CHUNK_SIZE.min(b - a + 1)].copy_from_slice(&data[a..b]);
+        chunk[1..data_chunk.len() + 1].copy_from_slice(&data_chunk);
         encoding[i] = Felt::from_bytes_be(&chunk);
     }
     encoding

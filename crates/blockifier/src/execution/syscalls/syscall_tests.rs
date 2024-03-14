@@ -233,7 +233,7 @@ mod test_emit_event {
             data_length: max_event_data_length + 1,
             max_data_length: max_event_data_length,
         };
-        assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
+        assert!(error.to_string().contains(&expected_error.to_string()));
     }
 
     #[test_case(FeatureContract::SierraTestContract; "Native")]
@@ -250,7 +250,7 @@ mod test_emit_event {
             max_keys_length: max_event_keys_length,
         };
 
-        assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
+        assert!(error.to_string().contains(&expected_error.to_string()));
     }
 
     #[test_case(FeatureContract::SierraTestContract; "Native")]
