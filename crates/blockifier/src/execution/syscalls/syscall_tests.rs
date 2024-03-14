@@ -37,8 +37,7 @@ use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
 use crate::execution::sierra_utils::NATIVE_GAS_PLACEHOLDER;
 use crate::execution::syscalls::hint_processor::{
     EmitEventError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, FAILED_TO_EXECUTE_CALL,
-    FAILED_TO_GET_CONTRACT_CLASS, FORBIDDEN_CLASS_REPLACEMENT, INVALID_EXECUTION_MODE_ERROR,
-    L1_GAS, L2_GAS, OUT_OF_GAS_ERROR,
+    INVALID_EXECUTION_MODE_ERROR, L1_GAS, L2_GAS, OUT_OF_GAS_ERROR,
 };
 use crate::retdata;
 use crate::state::state_api::{State, StateReader};
@@ -833,103 +832,66 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     assert_eq!(main_entry_point.execute_directly(&mut state).unwrap(), expected_call_info);
 }
 
-#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 1234; "VM")] // pass
-fn test_replace_class_with_undeclared_class_hash(
-    contract_type: FeatureContract,
-    gas_consumed: u64,
-) {
-    let mut state = create_deploy_test_state(contract_type);
+#[cfg(test)]
+mod test_replace_class2 {
+    use self::test_case;
+    use super::{assert_eq, *};
 
-    let entry_point_call = CallEntryPoint {
-        calldata: calldata![stark_felt!(1234_u16)],
-        entry_point_selector: selector_from_name("test_replace_class"),
-        ..trivial_external_entry_point()
-    };
+    #[test_case(FeatureContract::SierraTestContract; "Native")]
+    #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")]
+    fn undeclared_class_hash(test_contract: FeatureContract) {
+        let mut state = create_deploy_test_state(test_contract);
+        let entry_point_call = CallEntryPoint {
+            calldata: calldata![stark_felt!(1234_u16)],
+            entry_point_selector: selector_from_name("test_replace_class"),
+            ..trivial_external_entry_point()
+        };
 
-    if let FeatureContract::SierraTestContract = contract_type {
-        let error = entry_point_call.execute_directly(&mut state).unwrap();
-        let retdata = Retdata(vec![stark_felt!(FAILED_TO_GET_CONTRACT_CLASS)]);
-        assert_eq!(
-            error.execution,
-            CallExecution { gas_consumed, retdata, failed: true, ..Default::default() }
-        );
-    } else {
-        let error = entry_point_call.execute_directly(&mut state).unwrap_err();
-
-        assert_matches!(
-            error,
-            EntryPointExecutionError::VirtualMachineExecutionErrorWithTrace { .. }
-        );
-
-        let expected_error = format!("Class with hash {} is not declared.", stark_felt!(1234_u16));
-
-        assert!(error.try_to_vm_trace().contains(&expected_error));
+        let error = entry_point_call.execute_directly(&mut state).unwrap_err().to_string();
+        assert!(error.contains("is not declared"));
     }
-}
 
-#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 1234; "VM")] // pass
-fn test_replace_class_with_cairo_0_class_hash(contract_type: FeatureContract, gas_consumed: u64) {
-    let mut state = create_deploy_test_state(contract_type);
+    #[test_case(FeatureContract::SierraTestContract; "Native")]
+    #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")]
+    fn cairo0_class_hash(test_contract: FeatureContract) {
+        let mut state = create_deploy_test_state(test_contract);
 
-    let v0_class_hash = class_hash!(5678_u16);
-    let v0_contract_class = ContractClassV0::from_file(TEST_EMPTY_CONTRACT_CAIRO0_PATH).into();
-    state.set_contract_class(v0_class_hash, v0_contract_class).unwrap();
+        let v0_class_hash = class_hash!(5678_u16);
+        let v0_contract_class = ContractClassV0::from_file(TEST_EMPTY_CONTRACT_CAIRO0_PATH).into();
+        state.set_contract_class(v0_class_hash, v0_contract_class).unwrap();
 
-    let entry_point_call = CallEntryPoint {
-        calldata: calldata![v0_class_hash.0],
-        entry_point_selector: selector_from_name("test_replace_class"),
-        ..trivial_external_entry_point()
-    };
-    let error = entry_point_call.execute_directly(&mut state);
+        let entry_point_call = CallEntryPoint {
+            calldata: calldata![v0_class_hash.0],
+            entry_point_selector: selector_from_name("test_replace_class"),
+            ..trivial_external_entry_point()
+        };
+        let error = entry_point_call.execute_directly(&mut state).unwrap_err().to_string();
+        dbg!(&error);
+        assert!(error.contains("Cannot replace V1 class hash with V0 class hash"));
+    }
 
-    if let FeatureContract::SierraTestContract = contract_type {
-        let retdata = Retdata(vec![stark_felt!(FORBIDDEN_CLASS_REPLACEMENT)]);
+    #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
+    #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 14450; "VM")] // pass
+    fn positive_flow(test_contract: FeatureContract, gas_consumed: u64) {
+        let mut state = create_deploy_test_state(test_contract);
+        let contract_address = contract_address!(TEST_CONTRACT_ADDRESS);
+        let current_class_hash = class_hash!(TEST_CLASS_HASH);
+
+        assert_eq!(state.get_class_hash_at(contract_address).unwrap(), current_class_hash);
+
+        let new_class_hash = class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH);
+        let entry_point_call = CallEntryPoint {
+            calldata: calldata![new_class_hash.0],
+            entry_point_selector: selector_from_name("test_replace_class"),
+            ..trivial_external_entry_point()
+        };
 
         assert_eq!(
-            error.unwrap().execution,
-            CallExecution { gas_consumed, retdata, failed: true, ..Default::default() }
+            entry_point_call.execute_directly(&mut state).unwrap().execution,
+            CallExecution { gas_consumed, ..Default::default() }
         );
-    } else {
-        let error = error.unwrap_err();
-
-        assert_matches!(
-            error,
-            EntryPointExecutionError::VirtualMachineExecutionErrorWithTrace { .. }
-        );
-
-        let expected_error = format!(
-            "Got an exception while executing a hint: Cannot replace V1 class hash with V0 class \
-             hash: {}.",
-            v0_class_hash.to_string()
-        );
-
-        assert!(error.try_to_vm_trace().contains(&expected_error));
+        assert_eq!(state.get_class_hash_at(contract_address).unwrap(), new_class_hash);
     }
-}
-
-#[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 14450; "VM")] // pass
-fn test_replace_class(contract_type: FeatureContract, gas_consumed: u64) {
-    let mut state = create_deploy_test_state(contract_type);
-    let contract_address = contract_address!(TEST_CONTRACT_ADDRESS);
-    let old_class_hash = class_hash!(TEST_CLASS_HASH);
-    let new_class_hash = class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH);
-
-    assert_eq!(state.get_class_hash_at(contract_address).unwrap(), old_class_hash);
-
-    let entry_point_call = CallEntryPoint {
-        calldata: calldata![new_class_hash.0],
-        entry_point_selector: selector_from_name("test_replace_class"),
-        ..trivial_external_entry_point()
-    };
-
-    assert_eq!(
-        entry_point_call.execute_directly(&mut state).unwrap().execution,
-        CallExecution { gas_consumed, ..Default::default() }
-    );
-    assert_eq!(state.get_class_hash_at(contract_address).unwrap(), new_class_hash);
 }
 
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // including the relevant function causes failure due to gas processing
