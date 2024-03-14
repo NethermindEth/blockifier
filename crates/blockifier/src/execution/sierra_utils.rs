@@ -208,7 +208,7 @@ pub fn run_native_executor(
             info: if !res.return_values.is_empty() {
                 decode_felts_as_str(&res.return_values)
             } else {
-                String::from("unknown error")
+                String::from("Unknown error")
             },
         }),
         Err(runner_err) => {
