@@ -268,7 +268,7 @@ mod test_emit_event {
             n_emitted_events: max_n_emitted_events + 1,
             max_n_emitted_events,
         };
-        assert!(error.to_string().contains(format!("{}", expected_error).as_str()));
+        assert!(error.to_string().contains(&expected_error.to_string()));
     }
 
     fn emit_events(
