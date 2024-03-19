@@ -135,6 +135,8 @@ pub fn setup_syscall_handler<'state>(
     events: Vec<OrderedEvent>,
     l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
     inner_calls: Vec<CallInfo>,
+    storage_read_values: Vec<StarkFelt>,
+    accessed_storage_keys: HashSet<StorageKey, RandomState>,
 ) -> NativeSyscallHandler<'state> {
     NativeSyscallHandler {
         state,
@@ -146,6 +148,8 @@ pub fn setup_syscall_handler<'state>(
         l2_to_l1_messages,
         execution_resources,
         inner_calls,
+        storage_read_values,
+        accessed_storage_keys,
     }
 }
 
