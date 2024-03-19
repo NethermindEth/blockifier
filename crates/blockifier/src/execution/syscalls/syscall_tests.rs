@@ -992,196 +992,170 @@ fn test_send_message_to_l1(test_contract: FeatureContract, expected_gas: u64) {
     );
 }
 
-#[test_case(
-    FeatureContract::SierraTestContract,
-    class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
-    calldata![
-    stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH), // Class hash.
-    ContractAddressSalt::default().0,            // Contract_address_salt.
-    stark_felt!(0_u8),                           // Calldata length.
-    stark_felt!(0_u8)                            // deploy_from_zero.
-    ],
-    calldata![],
-    None,
-    NATIVE_GAS_PLACEHOLDER;
-    "[Native] No constructor: Positive flow"
-)] // pass
-#[test_case(
-    FeatureContract::TestContract(CairoVersion::Cairo1),
-    class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
-    calldata![
-    stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH), // Class hash.
-    ContractAddressSalt::default().0,            // Contract_address_salt.
-    stark_felt!(0_u8),                           // Calldata length.
-    stark_felt!(0_u8)                            // deploy_from_zero.
-    ],
-    calldata![],
-    None,
-    16640;
-    "[VM] No constructor: Positive flow"
-)] // pass
-#[test_case(
-    FeatureContract::SierraTestContract,
-    class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
-    calldata![
-        stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH), // Class hash.
-        ContractAddressSalt::default().0,            // Contract_address_salt.
-        stark_felt!(2_u8),                           // Calldata length.
-        stark_felt!(2_u8),                           // Calldata: address.
-        stark_felt!(1_u8),                           // Calldata: value.
-        stark_felt!(0_u8)                            // deploy_from_zero.
-    ],
-    calldata![
-        stark_felt!(2_u8),                           // Calldata: arg1.
-        stark_felt!(1_u8)                            // Calldata: arg2.
-    ],
-    Some("Cannot pass calldata to a contract with no constructor"),
-    NATIVE_GAS_PLACEHOLDER;
-    "[Native] No constructor: Negative flow: nonempty calldata")] // pass
-#[test_case(
-    FeatureContract::TestContract(CairoVersion::Cairo1),
-    class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH),
-    calldata![
-        stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH), // Class hash.
-        ContractAddressSalt::default().0,            // Contract_address_salt.
-        stark_felt!(2_u8),                           // Calldata length.
-        stark_felt!(2_u8),                           // Calldata: address.
-        stark_felt!(1_u8),                           // Calldata: value.
-        stark_felt!(0_u8)                            // deploy_from_zero.
-    ],
-    calldata![
-        stark_felt!(2_u8),                           // Calldata: arg1.
-        stark_felt!(1_u8)                            // Calldata: arg2.
-    ],
-    Some("Cannot pass calldata to a contract with no constructor"),
-    16640;
-    "[VM] No constructor: Negative flow: nonempty calldata")] // pass
-#[test_case(
-    FeatureContract::SierraTestContract,
-    class_hash!(TEST_CLASS_HASH),
-    calldata![
-        stark_felt!(TEST_CLASS_HASH),     // Class hash.
-        ContractAddressSalt::default().0, // Contract_address_salt.
-        stark_felt!(2_u8),                // Calldata length.
-        stark_felt!(1_u8),                // Calldata: arg1.
-        stark_felt!(1_u8),                // Calldata: arg2.
-        stark_felt!(0_u8)                 // deploy_from_zero.
-    ],
-    calldata![
-        stark_felt!(1_u8),                // Calldata: arg1.
-        stark_felt!(1_u8)                 // Calldata: arg2.
-    ],
-    None,
-    NATIVE_GAS_PLACEHOLDER;
-    "[Native] With constructor: Positive flow")] // pass
-#[test_case(
-    FeatureContract::TestContract(CairoVersion::Cairo1),
-    class_hash!(TEST_CLASS_HASH),
-    calldata![
+mod deploy_tests {
+    use super::{assert_eq, test_case, *};
+
+    #[test_case(
+        FeatureContract::SierraTestContract;
+        "Native"
+    )] // pass
+    #[test_case(
+        FeatureContract::TestContract(CairoVersion::Cairo1);
+        "VM"
+    )] // pass
+    fn no_constructor_positive_flow(feature_contract: FeatureContract) {
+        let mut state = create_deploy_test_state(feature_contract);
+        let class_hash = class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH);
+        let calldata = calldata![
+            stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH),
+            ContractAddressSalt::default().0,
+            stark_felt!(0_u8),
+            stark_felt!(0_u8)
+        ];
+        let entry_point_call = CallEntryPoint {
+            entry_point_selector: selector_from_name("test_deploy"),
+            calldata,
+            ..trivial_external_entry_point()
+        };
+
+        // No errors expected.
+        let contract_address = calculate_contract_address(
+            ContractAddressSalt::default(),
+            class_hash,
+            &calldata![],
+            contract_address!(TEST_CONTRACT_ADDRESS),
+        )
+        .unwrap();
+
+        let deploy_call = &entry_point_call.execute_directly(&mut state).unwrap().inner_calls[0];
+
+        assert_eq!(deploy_call.call.storage_address, contract_address);
+        assert_eq!(
+            deploy_call.execution,
+            CallExecution { retdata: retdata![], gas_consumed: 0, ..CallExecution::default() }
+        );
+        assert_eq!(state.get_class_hash_at(contract_address).unwrap(), class_hash);
+    }
+
+    #[test_case(
+        FeatureContract::SierraTestContract;
+        "Native"
+    )] // pass
+    #[test_case(
+        FeatureContract::TestContract(CairoVersion::Cairo1);
+        "VM"
+    )] // pass
+    fn no_constructor_negative_flow_nonempty_calldata(feature_contract: FeatureContract) {
+        let calldata = calldata![
+            stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH),
+            ContractAddressSalt::default().0,
+            stark_felt!(2_u8),
+            stark_felt!(2_u8),
+            stark_felt!(1_u8),
+            stark_felt!(0_u8)
+        ];
+
+        let mut state = create_deploy_test_state(feature_contract);
+        let entry_point_call = CallEntryPoint {
+            entry_point_selector: selector_from_name("test_deploy"),
+            calldata,
+            ..trivial_external_entry_point()
+        };
+
+        let execution_result = entry_point_call.execute_directly(&mut state);
+        let error = execution_result.unwrap_err().to_string();
+
+        assert!(error.contains("Cannot pass calldata to a contract with no constructor"));
+    }
+
+    #[test_case(
+        FeatureContract::SierraTestContract,
+        NATIVE_GAS_PLACEHOLDER;
+        "Native"
+    )] // pass
+    #[test_case(
+        FeatureContract::TestContract(CairoVersion::Cairo1),
+        16640;
+        "VM"
+    )] // pass
+    fn with_constructor_positive_flow(feature_contract: FeatureContract, gas: u64) {
+        let class_hash = class_hash!(TEST_CLASS_HASH);
+        let calldata = calldata![
             stark_felt!(TEST_CLASS_HASH),     // Class hash.
             ContractAddressSalt::default().0, // Contract_address_salt.
             stark_felt!(2_u8),                // Calldata length.
             stark_felt!(1_u8),                // Calldata: arg1.
             stark_felt!(1_u8),                // Calldata: arg2.
             stark_felt!(0_u8)                 // deploy_from_zero.
-        ],
-    calldata![
-            stark_felt!(1_u8),                // Calldata: arg1.
-            stark_felt!(1_u8)                 // Calldata: arg2.
-        ],
-    None,
-    16640;
-    "[VM] With constructor: Positive flow")] // pass
-#[test_case(
-    FeatureContract::SierraTestContract,
-    class_hash!(TEST_CLASS_HASH),
-    calldata![
-        stark_felt!(TEST_CLASS_HASH),     // Class hash.
-        ContractAddressSalt::default().0, // Contract_address_salt.
-        stark_felt!(2_u8),                // Calldata length.
-        stark_felt!(3_u8),                // Calldata: arg1.
-        stark_felt!(3_u8),                // Calldata: arg2.
-        stark_felt!(0_u8)                 // deploy_from_zero.
-    ],
-    calldata![
-        stark_felt!(3_u8),                // Calldata: arg1.
-        stark_felt!(3_u8)                 // Calldata: arg2.
-    ],
-    Some("unavailable for deployment"),
-    NATIVE_GAS_PLACEHOLDER;
-    "[Native] With constructor: Negative flow: deploy to the same address")
-] // pass
-#[test_case(
-    FeatureContract::TestContract(CairoVersion::Cairo1),
-    class_hash!(TEST_CLASS_HASH),
-    calldata![
-        stark_felt!(TEST_CLASS_HASH),     // Class hash.
-        ContractAddressSalt::default().0, // Contract_address_salt.
-        stark_felt!(2_u8),                // Calldata length.
-        stark_felt!(3_u8),                // Calldata: arg1.
-        stark_felt!(3_u8),                // Calldata: arg2.
-        stark_felt!(0_u8)                 // deploy_from_zero.
-    ],
-    calldata![
-        stark_felt!(3_u8),                // Calldata: arg1.
-        stark_felt!(3_u8)                 // Calldata: arg2.
-    ],
-    Some("unavailable for deployment"),
-    16640;
-    "[VM] With constructor: Negative flow: deploy to the same address")
-] // pass
-fn test_deploy(
-    feature_contract: FeatureContract,
-    class_hash: ClassHash,
-    calldata: Calldata,
-    constructor_calldata: Calldata,
-    expected_error: Option<&str>,
-    gas: u64,
-) {
-    let mut state = create_deploy_test_state(feature_contract);
-    let entry_point_call = CallEntryPoint {
-        entry_point_selector: selector_from_name("test_deploy"),
-        calldata,
-        ..trivial_external_entry_point()
-    };
+        ];
+        let constructor_calldata = calldata![
+            stark_felt!(1_u8), // Calldata: arg1.
+            stark_felt!(1_u8)  // Calldata: arg2.
+        ];
 
-    if let Some(expected_error) = expected_error {
+        let mut state = create_deploy_test_state(feature_contract);
+        let entry_point_call = CallEntryPoint {
+            entry_point_selector: selector_from_name("test_deploy"),
+            calldata,
+            ..trivial_external_entry_point()
+        };
+
+        // No errors expected.
+        let contract_address = calculate_contract_address(
+            ContractAddressSalt::default(),
+            class_hash,
+            &constructor_calldata,
+            contract_address!(TEST_CONTRACT_ADDRESS),
+        )
+        .unwrap();
+
+        let deploy_call = &entry_point_call.execute_directly(&mut state).unwrap().inner_calls[0];
+
+        assert_eq!(deploy_call.call.storage_address, contract_address);
+        assert_eq!(
+            deploy_call.execution,
+            CallExecution {
+                retdata: retdata![constructor_calldata.0[0]],
+                gas_consumed: gas,
+                ..CallExecution::default()
+            }
+        );
+        assert_eq!(state.get_class_hash_at(contract_address).unwrap(), class_hash);
+    }
+
+    #[test_case(
+        FeatureContract::SierraTestContract;
+        "Native"
+    )] // pass
+    #[test_case(
+        FeatureContract::TestContract(CairoVersion::Cairo1);
+        "VM"
+    )] // pass
+    fn with_constructor_negative_flow_deploy_to_the_same_address(
+        feature_contract: FeatureContract,
+    ) {
+        let calldata = calldata![
+            stark_felt!(TEST_CLASS_HASH),     // Class hash.
+            ContractAddressSalt::default().0, // Contract_address_salt.
+            stark_felt!(2_u8),                // Calldata length.
+            stark_felt!(3_u8),                // Calldata: arg1.
+            stark_felt!(3_u8),                // Calldata: arg2.
+            stark_felt!(0_u8)                 // deploy_from_zero.
+        ];
+        let mut state = create_deploy_test_state(feature_contract);
+        let entry_point_call = CallEntryPoint {
+            entry_point_selector: selector_from_name("test_deploy"),
+            calldata,
+            ..trivial_external_entry_point()
+        };
+
         let execution_result = entry_point_call.execute_directly(&mut state);
         let error = execution_result.unwrap_err().to_string();
 
-        println!("Error: {}", error);
-        assert!(error.contains(expected_error));
+        assert!(error.contains("unavailable for deployment"));
 
         return;
     }
-
-    // No errors expected.
-    let contract_address = calculate_contract_address(
-        ContractAddressSalt::default(),
-        class_hash,
-        &constructor_calldata,
-        contract_address!(TEST_CONTRACT_ADDRESS),
-    )
-    .unwrap();
-
-    let deploy_call = &entry_point_call.execute_directly(&mut state).unwrap().inner_calls[0];
-
-    assert_eq!(deploy_call.call.storage_address, contract_address);
-
-    let mut retdata = retdata![];
-    let gas_consumed = if constructor_calldata.0.is_empty() {
-        0
-    } else {
-        retdata.0.push(constructor_calldata.0[0]);
-        gas
-    };
-
-    assert_eq!(
-        deploy_call.execution,
-        CallExecution { retdata, gas_consumed, ..CallExecution::default() }
-    );
-
-    assert_eq!(state.get_class_hash_at(contract_address).unwrap(), class_hash);
 }
 
 #[test_case(FeatureContract::SierraTestContract; "Native")] // fail bc it doesn't limit on gas, not expecting it to yet
