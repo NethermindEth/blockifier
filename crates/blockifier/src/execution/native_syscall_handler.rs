@@ -249,7 +249,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             // todo: handle gas properly
             *remaining_gas as u64,
         )
-        .map_err(|_| vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()])?;
+        .map_err(|err| encode_str_as_felts(&err.to_string()))?;
 
         let return_data =
             call_info.execution.retdata.0[..].iter().map(|felt| starkfelt_to_felt(*felt)).collect();
