@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::hash::RandomState;
 use std::rc::Rc;
 
 use cairo_lang_sierra::ids::FunctionId;
@@ -17,6 +18,7 @@ use num_traits::ToBytes;
 use starknet_api::core::{ChainId, ClassHash, ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
+use starknet_api::state::StorageKey;
 use starknet_types_core::felt::{Felt, FromStrError};
 
 use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
@@ -224,6 +226,8 @@ pub fn create_callinfo(
     events: Vec<OrderedEvent>,
     l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
     inner_calls: Vec<CallInfo>,
+    storage_read_values: Vec<StarkFelt>,
+    accessed_storage_keys: HashSet<StorageKey, RandomState>,
 ) -> Result<CallInfo, super::errors::EntryPointExecutionError> {
     Ok(CallInfo {
         call,
@@ -240,10 +244,10 @@ pub fn create_callinfo(
             n_steps: 0,
             n_memory_holes: 0,
             builtin_instance_counter: HashMap::default(),
-        }, // REVIEW what do we do with this, given that we can't count casm steps
+        },
         inner_calls,
-        storage_read_values: vec![],
-        accessed_storage_keys: HashSet::new(),
+        storage_read_values,
+        accessed_storage_keys,
     })
 }
 
