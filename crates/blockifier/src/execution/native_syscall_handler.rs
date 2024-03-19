@@ -1,7 +1,7 @@
+use std::collections::HashSet;
+use std::hash::RandomState;
 use std::sync::Arc;
 
-use ark_ec::short_weierstrass::SWCurveConfig;
-use ark_ff::PrimeField;
 use cairo_felt::Felt252;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarkNetSyscallHandler,
@@ -21,8 +21,8 @@ use starknet_api::transaction::{
 use starknet_types_core::felt::Felt;
 
 use super::sierra_utils::{
-    big4int_to_u256, chain_id_to_felt, contract_address_to_felt, encode_str_as_felts,
-    felt_to_starkfelt, starkfelt_to_felt, u256_to_biguint,
+    allocate_point, big4int_to_u256, chain_id_to_felt, contract_address_to_felt,
+    encode_str_as_felts, felt_to_starkfelt, starkfelt_to_felt, u256_to_biguint,
 };
 use super::syscalls::exceeds_event_size_limit;
 use crate::abi::constants;
@@ -34,9 +34,7 @@ use crate::execution::entry_point::{
 };
 use crate::execution::execution_utils::execute_deployment;
 use crate::execution::syscalls::hint_processor::{
-    execute_inner_call_raw, SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR,
-    FAILED_TO_CALCULATE_CONTRACT_ADDRESS, FAILED_TO_EXECUTE_CALL, FAILED_TO_READ_RESULT,
-    FAILED_TO_WRITE, INVALID_ARGUMENT, INVALID_EXECUTION_MODE_ERROR, INVALID_INPUT_LENGTH_ERROR,
+    SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };
 use crate::execution::syscalls::secp::{
     SecpAddRequest, SecpAddResponse, SecpGetPointFromXRequest, SecpGetPointFromXResponse,
@@ -57,37 +55,8 @@ pub struct NativeSyscallHandler<'state> {
     // Secp hint processors.
     pub secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
     pub secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
-}
-impl NativeSyscallHandler<'_> {
-    fn allocate_point<Curve: SWCurveConfig>(
-        point_x: U256,
-        point_y: U256,
-        hint_processor: &mut SecpHintProcessor<Curve>,
-    ) -> SyscallResult<usize>
-    where
-        Curve::BaseField: PrimeField,
-    {
-        let request = SecpNewRequest { x: u256_to_biguint(point_x), y: u256_to_biguint(point_y) };
-
-        let response = hint_processor.secp_new_unchecked(request);
-
-        Self::parse_allocate_point_response(response)
-    }
-
-    fn parse_allocate_point_response(
-        response: crate::execution::syscalls::SyscallResult<SecpNewResponse>,
-    ) -> SyscallResult<usize> {
-        match response {
-            // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
-            Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
-            Err(SyscallExecutionError::SyscallError { error_data }) => {
-                Err(error_data.iter().map(|felt| starkfelt_to_felt(*felt)).collect())
-            }
-            Err(_) => unreachable!(
-                "Can't receive an error other than SyscallError from `secp_new_unchecked`."
-            ),
-        }
-    }
+    pub storage_read_values: Vec<StarkFelt>,
+    pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
 }
 
 impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
@@ -97,11 +66,12 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
         if self.execution_context.execution_mode == ExecutionMode::Validate {
-            let execution_mode_err = encode_str_as_felts(
-                "Unauthorized syscall get_block_hash in execution mode Validate",
-            );
+            let err = SyscallExecutionError::InvalidSyscallInExecutionMode {
+                syscall_name: "get_block_hash".to_string(),
+                execution_mode: ExecutionMode::Validate,
+            };
 
-            return Err(execution_mode_err);
+            return Err(encode_str_as_felts(&err.to_string()));
         }
 
         let current_block_number =
@@ -118,14 +88,14 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         }
 
         let key = StorageKey::try_from(StarkFelt::from(block_number))
-            .map_err(|e| vec![Felt::from_bytes_be_slice(e.to_string().as_bytes())])?;
+            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
         let block_hash_address =
             ContractAddress::try_from(StarkFelt::from(constants::BLOCK_HASH_CONTRACT_ADDRESS))
-                .map_err(|e| vec![Felt::from_bytes_be_slice(e.to_string().as_bytes())])?;
+                .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         match self.state.get_storage_at(block_hash_address, key) {
             Ok(value) => Ok(Felt::from_bytes_be_slice(value.bytes())),
-            Err(e) => Err(vec![Felt::from_bytes_be_slice(e.to_string().as_bytes())]),
+            Err(e) => Err(encode_str_as_felts(&e.to_string())),
         }
     }
 
@@ -231,7 +201,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             &wrapper_calldata,
             deployer_address,
         )
-        .map_err(|_| vec![Felt::from_hex(FAILED_TO_CALCULATE_CONTRACT_ADDRESS).unwrap()])?;
+        .map_err(|err| encode_str_as_felts(&err.to_string()))?;
 
         let ctor_context = ConstructorContext {
             class_hash,
@@ -249,7 +219,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             // todo: handle gas properly
             *remaining_gas as u64,
         )
-        .map_err(|err| encode_str_as_felts(&err.to_string()))?;
+        .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
         let return_data =
             call_info.execution.retdata.0[..].iter().map(|felt| starkfelt_to_felt(*felt)).collect();
@@ -311,12 +281,21 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             initial_gas: *remaining_gas as u64,
         };
 
-        execute_inner_call_raw(
-            entry_point,
-            self.state,
-            &mut self.execution_resources,
-            &mut self.execution_context,
-        )
+        let call_info = entry_point
+            .execute(self.state, &mut self.execution_resources, &mut self.execution_context)
+            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+        let retdata = call_info
+            .execution
+            .retdata
+            .0
+            .iter()
+            .map(|felt| starkfelt_to_felt(*felt))
+            .collect::<Vec<Felt>>();
+
+        self.inner_calls.push(call_info);
+
+        Ok(retdata)
     }
 
     fn call_contract(
@@ -327,12 +306,17 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         remaining_gas: &mut u128,
     ) -> SyscallResult<Vec<Felt>> {
         let contract_address = ContractAddress::try_from(felt_to_starkfelt(address))
-            .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+            .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
         if self.execution_context.execution_mode == ExecutionMode::Validate
             && self.contract_address != contract_address
         {
-            return Err(vec![Felt::from_hex(INVALID_EXECUTION_MODE_ERROR).unwrap()]);
+            let err = SyscallExecutionError::InvalidSyscallInExecutionMode {
+                syscall_name: "call_contract".to_string(),
+                execution_mode: ExecutionMode::Validate,
+            };
+
+            return Err(encode_str_as_felts(&err.to_string()));
         }
 
         let wrapper_calldata = Calldata(Arc::new(
@@ -353,12 +337,21 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             initial_gas: *remaining_gas as u64,
         };
 
-        execute_inner_call_raw(
-            entry_point,
-            self.state,
-            &mut self.execution_resources,
-            &mut self.execution_context,
-        )
+        let call_info = entry_point
+            .execute(self.state, &mut self.execution_resources, &mut self.execution_context)
+            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+        let retdata = call_info
+            .execution
+            .retdata
+            .0
+            .iter()
+            .map(|felt| starkfelt_to_felt(*felt))
+            .collect::<Vec<Felt>>();
+
+        self.inner_calls.push(call_info);
+
+        Ok(retdata)
     }
 
     fn storage_read(
@@ -367,16 +360,18 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         address: Felt,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
-        // TODO - in progress - Dom
-        let storage_key = StorageKey(
+        let key = StorageKey(
             PatriciaKey::try_from(felt_to_starkfelt(address))
-                .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?,
+                .map_err(|e| encode_str_as_felts(&e.to_string()))?,
         );
-        let read_result = self.state.get_storage_at(self.contract_address, storage_key);
-        let unsafe_read_result =
-            read_result.map_err(|_| vec![Felt::from_hex(FAILED_TO_READ_RESULT).unwrap()])?;
 
-        Ok(starkfelt_to_felt(unsafe_read_result))
+        let read_result = self.state.get_storage_at(self.contract_address, key);
+        let value = read_result.map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+        self.accessed_storage_keys.insert(key);
+        self.storage_read_values.push(value);
+
+        Ok(starkfelt_to_felt(value))
     }
 
     fn storage_write(
@@ -386,14 +381,16 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         value: Felt,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
-        let storage_key = StorageKey(
+        let key = StorageKey(
             PatriciaKey::try_from(felt_to_starkfelt(address))
-                .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?,
+                .map_err(|e| encode_str_as_felts(&e.to_string()))?,
         );
+        self.accessed_storage_keys.insert(key);
 
         let write_result =
-            self.state.set_storage_at(self.contract_address, storage_key, felt_to_starkfelt(value));
-        write_result.map_err(|_| vec![Felt::from_hex(FAILED_TO_WRITE).unwrap()])?;
+            self.state.set_storage_at(self.contract_address, key, felt_to_starkfelt(value));
+        write_result.map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
         Ok(())
     }
 
@@ -438,7 +435,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             order,
             message: MessageToL1 {
                 to_address: EthAddress::try_from(felt_to_starkfelt(to_address))
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?,
+                    .map_err(|e| encode_str_as_felts(&e.to_string()))?,
                 payload: L2ToL1Payload(
                     payload.iter().map(|felt| felt_to_starkfelt(*felt)).collect(),
                 ),
@@ -481,8 +478,8 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         p1: Secp256k1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        let p_p0 = Self::allocate_point(p0.x, p0.y, &mut self.secp256k1_hint_processor)?;
-        let p_p1 = Self::allocate_point(p1.x, p1.y, &mut self.secp256k1_hint_processor)?;
+        let p_p0 = allocate_point(p0.x, p0.y, &mut self.secp256k1_hint_processor)?;
+        let p_p1 = allocate_point(p1.x, p1.y, &mut self.secp256k1_hint_processor)?;
         let request = SecpAddRequest { lhs_id: Felt252::from(p_p0), rhs_id: Felt252::from(p_p1) };
 
         match self.secp256k1_hint_processor.secp_add(request) {
@@ -492,7 +489,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256k1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);
 
@@ -501,7 +498,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             Err(SyscallExecutionError::SyscallError { error_data }) => {
                 Err(error_data.iter().map(|felt| starkfelt_to_felt(*felt)).collect())
             }
-            Err(_) => Err(vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()]),
+            Err(error) => Err(encode_str_as_felts(&error.to_string())),
         }
     }
 
@@ -520,7 +517,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256k1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);
 
@@ -530,7 +527,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             Err(SyscallExecutionError::SyscallError { error_data }) => {
                 Err(error_data.iter().map(|felt| starkfelt_to_felt(*felt)).collect())
             }
-            Err(_) => Err(vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()]),
+            Err(error) => Err(encode_str_as_felts(&error.to_string())),
         }
     }
 
@@ -548,7 +545,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        let p_id = Self::allocate_point(p.x, p.y, &mut self.secp256k1_hint_processor)?;
+        let p_id = allocate_point(p.x, p.y, &mut self.secp256k1_hint_processor)?;
         let request =
             SecpMulRequest { ec_point_id: Felt252::from(p_id), multiplier: u256_to_biguint(m) };
 
@@ -559,7 +556,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256k1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);
 
@@ -596,8 +593,8 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         p1: Secp256r1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        let p_p0 = Self::allocate_point(p0.x, p0.y, &mut self.secp256r1_hint_processor)?;
-        let p_p1 = Self::allocate_point(p1.x, p1.y, &mut self.secp256r1_hint_processor)?;
+        let p_p0 = allocate_point(p0.x, p0.y, &mut self.secp256r1_hint_processor)?;
+        let p_p1 = allocate_point(p1.x, p1.y, &mut self.secp256r1_hint_processor)?;
         let request = SecpAddRequest { lhs_id: Felt252::from(p_p0), rhs_id: Felt252::from(p_p1) };
 
         match self.secp256r1_hint_processor.secp_add(request) {
@@ -607,7 +604,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256r1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);
 
@@ -635,7 +632,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256r1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);
 
@@ -663,7 +660,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        let p_id = Self::allocate_point(p.x, p.y, &mut self.secp256k1_hint_processor)?;
+        let p_id = allocate_point(p.x, p.y, &mut self.secp256k1_hint_processor)?;
         let request =
             SecpMulRequest { ec_point_id: Felt252::from(p_id), multiplier: u256_to_biguint(m) };
 
@@ -674,7 +671,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 let point = self
                     .secp256r1_hint_processor
                     .get_point_by_id(id)
-                    .map_err(|_| vec![Felt::from_hex(INVALID_ARGUMENT).unwrap()])?;
+                    .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
                 let x = big4int_to_u256(point.x.0);
                 let y = big4int_to_u256(point.y.0);

@@ -1,8 +1,10 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::hash::RandomState;
 use std::rc::Rc;
 
-use ark_ff::BigInt;
+use ark_ec::short_weierstrass::SWCurveConfig;
+use ark_ff::{BigInt, PrimeField};
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
@@ -20,6 +22,7 @@ use num_traits::ToBytes;
 use starknet_api::core::{ChainId, ClassHash, ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
+use starknet_api::state::StorageKey;
 use starknet_types_core::felt::{Felt, FromStrError};
 
 use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
@@ -28,7 +31,8 @@ use super::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use super::errors::EntryPointExecutionError;
 use super::native_syscall_handler::NativeSyscallHandler;
 use crate::execution::entry_point::EntryPointExecutionContext;
-use crate::execution::syscalls::secp::SecpHintProcessor;
+use crate::execution::syscalls::hint_processor::SyscallExecutionError;
+use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
 use crate::state::state_api::State;
 
 // An arbitrary number, chosen to avoid accidentally aligning with actually calculated gas
@@ -139,6 +143,8 @@ pub fn setup_syscall_handler<'state>(
     inner_calls: Vec<CallInfo>,
     secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
     secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
+    storage_read_values: Vec<StarkFelt>,
+    accessed_storage_keys: HashSet<StorageKey, RandomState>,
 ) -> NativeSyscallHandler<'state> {
     NativeSyscallHandler {
         state,
@@ -152,6 +158,8 @@ pub fn setup_syscall_handler<'state>(
         inner_calls,
         secp256k1_hint_processor,
         secp256r1_hint_processor,
+        storage_read_values,
+        accessed_storage_keys,
     }
 }
 
@@ -232,6 +240,8 @@ pub fn create_callinfo(
     events: Vec<OrderedEvent>,
     l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
     inner_calls: Vec<CallInfo>,
+    storage_read_values: Vec<StarkFelt>,
+    accessed_storage_keys: HashSet<StorageKey, RandomState>,
 ) -> Result<CallInfo, super::errors::EntryPointExecutionError> {
     Ok(CallInfo {
         call,
@@ -248,10 +258,10 @@ pub fn create_callinfo(
             n_steps: 0,
             n_memory_holes: 0,
             builtin_instance_counter: HashMap::default(),
-        }, // REVIEW what do we do with this, given that we can't count casm steps
+        },
         inner_calls,
-        storage_read_values: vec![],
-        accessed_storage_keys: HashSet::new(),
+        storage_read_values,
+        accessed_storage_keys,
     })
 }
 
@@ -289,4 +299,28 @@ pub fn decode_felts_as_str(encoding: &[Felt]) -> String {
         encoding.iter().flat_map(|felt| felt.to_bytes_be()[1..32].to_vec()).collect();
 
     String::from_utf8(bytes_err).unwrap().trim_matches('\0').to_owned()
+}
+
+pub fn allocate_point<Curve: SWCurveConfig>(
+    point_x: U256,
+    point_y: U256,
+    hint_processor: &mut SecpHintProcessor<Curve>,
+) -> cairo_native::starknet::SyscallResult<usize>
+where
+    Curve::BaseField: PrimeField,
+{
+    let request = SecpNewRequest { x: u256_to_biguint(point_x), y: u256_to_biguint(point_y) };
+
+    let response = hint_processor.secp_new_unchecked(request);
+
+    match response {
+        // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
+        Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
+        Err(SyscallExecutionError::SyscallError { error_data }) => {
+            Err(error_data.iter().map(|felt| starkfelt_to_felt(*felt)).collect())
+        }
+        Err(_) => unreachable!(
+            "Can't receive an error other than SyscallError from `secp_new_unchecked`."
+        ),
+    }
 }
