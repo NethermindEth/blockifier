@@ -539,12 +539,14 @@ fn test_cairo1_entry_point_segment_arena() {
         ..trivial_external_entry_point_new(test_contract)
     };
 
-    assert!(entry_point_call
-        .execute_directly(&mut state)
-        .unwrap()
-        .resources
-        .builtin_instance_counter
-        .contains_key(BuiltinName::segment_arena.name()));
+    assert!(
+        entry_point_call
+            .execute_directly(&mut state)
+            .unwrap()
+            .resources
+            .builtin_instance_counter
+            .contains_key(BuiltinName::segment_arena.name())
+    );
 }
 
 /// Fetch PC locations from the compiled contract to compute the expected PC locations in the

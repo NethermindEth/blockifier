@@ -370,9 +370,11 @@ mod test_get_block_hash {
         let execution_result =
             entry_point_call.execute_directly_in_validate_mode(&mut state).unwrap_err();
 
-        assert!(execution_result
-            .to_string()
-            .contains("Unauthorized syscall get_block_hash in execution mode Validate"));
+        assert!(
+            execution_result
+                .to_string()
+                .contains("Unauthorized syscall get_block_hash in execution mode Validate")
+        );
     }
 
     #[test_case(FeatureContract::SierraTestContract; "Native")]
@@ -749,11 +751,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     // Todo(rodrigo): Execution resources from the VM & Native are mesaured differently
     // helper function to change the expected resource values from both of executions
     let if_sierra = |a, b| {
-        if matches!(test_contract, FeatureContract::SierraTestContract) {
-            a
-        } else {
-            b
-        }
+        if matches!(test_contract, FeatureContract::SierraTestContract) { a } else { b }
     };
 
     // Create expected call info tree.
