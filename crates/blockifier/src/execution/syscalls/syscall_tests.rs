@@ -749,7 +749,11 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     // Todo(rodrigo): Execution resources from the VM & Native are mesaured differently
     // helper function to change the expected resource values from both of executions
     let if_sierra = |a, b| {
-        if matches!(test_contract, FeatureContract::SierraTestContract) { a } else { b }
+        if matches!(test_contract, FeatureContract::SierraTestContract) {
+            a
+        } else {
+            b
+        }
     };
 
     // Create expected call info tree.
@@ -766,7 +770,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999827120, 9999720720),
+        initial_gas: if_sierra(9999831220, 9999720720),
         ..trivial_external_entry_point_new(test_contract)
     };
     let library_entry_point = CallEntryPoint {
@@ -781,12 +785,12 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999865550, 9999814150),
+        initial_gas: if_sierra(9999866550, 9999814150),
         ..trivial_external_entry_point_new(test_contract)
     };
     let storage_entry_point = CallEntryPoint {
         calldata: calldata![stark_felt!(key), stark_felt!(value)],
-        initial_gas: if_sierra(9999865550, 9999625070),
+        initial_gas: if_sierra(9999866550, 9999625070),
         ..nested_storage_entry_point
     };
 
