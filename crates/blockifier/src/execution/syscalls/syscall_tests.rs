@@ -751,11 +751,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     // Todo(rodrigo): Execution resources from the VM & Native are mesaured differently
     // helper function to change the expected resource values from both of executions
     let if_sierra = |a, b| {
-        if matches!(test_contract, FeatureContract::SierraTestContract) {
-            a
-        } else {
-            b
-        }
+        if matches!(test_contract, FeatureContract::SierraTestContract) { a } else { b }
     };
 
     // Create expected call info tree.
@@ -1018,12 +1014,12 @@ mod deploy_tests {
     #[test_case(
         FeatureContract::SierraTestContract;
         "Native"
-    )] // pass
+    )]
     #[test_case(
         FeatureContract::TestContract(CairoVersion::Cairo1);
         "VM"
-    )] // pass
-    fn no_constructor_positive_flow(feature_contract: FeatureContract) {
+    )]
+    fn no_constructor(feature_contract: FeatureContract) {
         let mut state = create_deploy_test_state(feature_contract);
         let class_hash = class_hash!(TEST_EMPTY_CONTRACT_CLASS_HASH);
         let calldata = calldata![
@@ -1060,12 +1056,12 @@ mod deploy_tests {
     #[test_case(
         FeatureContract::SierraTestContract;
         "Native"
-    )] // pass
+    )]
     #[test_case(
         FeatureContract::TestContract(CairoVersion::Cairo1);
         "VM"
-    )] // pass
-    fn no_constructor_negative_flow_nonempty_calldata(feature_contract: FeatureContract) {
+    )]
+    fn no_constructor_nonempty_calldata(feature_contract: FeatureContract) {
         let calldata = calldata![
             stark_felt!(TEST_EMPTY_CONTRACT_CLASS_HASH),
             ContractAddressSalt::default().0,
@@ -1092,13 +1088,13 @@ mod deploy_tests {
         FeatureContract::SierraTestContract,
         NATIVE_GAS_PLACEHOLDER;
         "Native"
-    )] // pass
+    )]
     #[test_case(
         FeatureContract::TestContract(CairoVersion::Cairo1),
         16640;
         "VM"
-    )] // pass
-    fn with_constructor_positive_flow(feature_contract: FeatureContract, gas: u64) {
+    )]
+    fn with_constructor(feature_contract: FeatureContract, gas: u64) {
         let class_hash = class_hash!(TEST_CLASS_HASH);
         let calldata = calldata![
             stark_felt!(TEST_CLASS_HASH),     // Class hash.
@@ -1146,14 +1142,12 @@ mod deploy_tests {
     #[test_case(
         FeatureContract::SierraTestContract;
         "Native"
-    )] // pass
+    )]
     #[test_case(
         FeatureContract::TestContract(CairoVersion::Cairo1);
         "VM"
-    )] // pass
-    fn with_constructor_negative_flow_deploy_to_the_same_address(
-        feature_contract: FeatureContract,
-    ) {
+    )]
+    fn with_constructor_deploy_to_the_same_address(feature_contract: FeatureContract) {
         let calldata = calldata![
             stark_felt!(TEST_CLASS_HASH),     // Class hash.
             ContractAddressSalt::default().0, // Contract_address_salt.
