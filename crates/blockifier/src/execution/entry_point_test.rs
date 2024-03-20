@@ -539,14 +539,12 @@ fn test_cairo1_entry_point_segment_arena() {
         ..trivial_external_entry_point_new(test_contract)
     };
 
-    assert!(
-        entry_point_call
-            .execute_directly(&mut state)
-            .unwrap()
-            .resources
-            .builtin_instance_counter
-            .contains_key(BuiltinName::segment_arena.name())
-    );
+    assert!(entry_point_call
+        .execute_directly(&mut state)
+        .unwrap()
+        .resources
+        .builtin_instance_counter
+        .contains_key(BuiltinName::segment_arena.name()));
 }
 
 /// Fetch PC locations from the compiled contract to compute the expected PC locations in the
@@ -567,8 +565,17 @@ fn get_entry_point_offset(
                 .unwrap()
                 .offset
         }
-        ContractClass::V1(_) => panic!("Expected contract class V0, got V1."),
-        ContractClass::V1Sierra(_) => panic!("Expected contract class V0, got V1Sierra."),
+        ContractClass::V1(class) => {
+            class
+                .entry_points_by_type
+                .get(&EntryPointType::External)
+                .unwrap()
+                .iter()
+                .find(|ep| ep.selector == entry_point_selector)
+                .unwrap()
+                .offset
+        }
+        ContractClass::V1Sierra(_) => panic!("Expected V0 or V1, got V1Sierra."),
     }
 }
 
