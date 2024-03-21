@@ -13,7 +13,7 @@ use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
 use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
-use cairo_native::starknet::U256;
+use cairo_native::starknet::{ResourceBounds, SyscallResult, U256};
 use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use itertools::Itertools;
@@ -23,6 +23,7 @@ use starknet_api::core::{ChainId, ClassHash, ContractAddress, EntryPointSelector
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
+use starknet_api::transaction::Resource;
 use starknet_types_core::felt::{Felt, FromStrError};
 
 use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
@@ -31,9 +32,10 @@ use super::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use super::errors::EntryPointExecutionError;
 use super::native_syscall_handler::NativeSyscallHandler;
 use crate::execution::entry_point::EntryPointExecutionContext;
-use crate::execution::syscalls::hint_processor::SyscallExecutionError;
+use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
 use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
 use crate::state::state_api::State;
+use crate::transaction::objects::CurrentTransactionInfo;
 
 // An arbitrary number, chosen to avoid accidentally aligning with actually calculated gas
 // To be deleted once cairo native gas handling can be used
@@ -323,4 +325,29 @@ where
             "Can't receive an error other than SyscallError from `secp_new_unchecked`."
         ),
     }
+}
+
+pub fn calculate_resource_bounds(
+    tx_info: &CurrentTransactionInfo,
+) -> SyscallResult<Vec<ResourceBounds>> {
+    let l1_gas = StarkFelt::try_from(L1_GAS).map_err(|e| encode_str_as_felts(&e.to_string()))?;
+    let l2_gas = StarkFelt::try_from(L2_GAS).map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+    Ok(tx_info
+        .resource_bounds
+        .0
+        .iter()
+        .map(|(resource, resource_bound)| {
+            let resource = match resource {
+                Resource::L1Gas => l1_gas,
+                Resource::L2Gas => l2_gas,
+            };
+
+            ResourceBounds {
+                resource: starkfelt_to_felt(resource),
+                max_amount: resource_bound.max_amount,
+                max_price_per_unit: resource_bound.max_price_per_unit,
+            }
+        })
+        .collect())
 }
