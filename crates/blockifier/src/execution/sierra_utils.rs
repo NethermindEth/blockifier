@@ -326,7 +326,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod sierra_tests {
     use num_traits::Num;
     use starknet_api::core::PatriciaKey;
     use starknet_api::hash::StarkHash;
