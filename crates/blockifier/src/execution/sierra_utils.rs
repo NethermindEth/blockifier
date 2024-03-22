@@ -210,13 +210,13 @@ pub fn run_native_executor(
         NativeExecutor::Aot(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
             &starkfelts_to_felts(&call.calldata.0),
-            Some(call.initial_gas as u128), // TODO track gas reduction?
+            Some(call.initial_gas.into()),
             Some(syscall_handler),
         ),
         NativeExecutor::Jit(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
             &starkfelts_to_felts(&call.calldata.0),
-            Some(call.initial_gas as u128), // TODO track gas reduction?
+            Some(call.initial_gas.into()),
             Some(syscall_handler),
         ),
     };
