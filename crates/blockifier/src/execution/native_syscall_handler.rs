@@ -107,7 +107,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<cairo_native::starknet::ExecutionInfo> {
-        panic!("smth smth")
+        panic!("Blockifier doesn't use this syscall")
     }
 
     fn get_execution_info_v2(
@@ -145,7 +145,6 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         };
 
         // Get Transaction Info
-
         let tx_info = &self.execution_context.tx_context.tx_info;
         let mut native_tx_info = TxV2Info {
             version: starkfelt_to_felt(tx_info.signed_version().0),
@@ -159,7 +158,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             .unwrap(),
             nonce: starkfelt_to_felt(tx_info.nonce().0),
             // This values are only required for TransactionInfo::Current
-            // todo(rodrigo): it would be nice if TxV2Info implemented the Default trait
+            // todo(rodrigo): it would be nice for TxV2Info to implement the Default trait
             resource_bounds: Vec::new(),
             tip: 0,
             paymaster_data: Vec::new(),
@@ -167,6 +166,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             fee_data_availability_mode: 0,
             account_deployment_data: Vec::new(),
         };
+        // If handling V3 transaction fill the "default" fields
         if let TransactionInfo::Current(context) = tx_info {
             let to_u32 = |x| match x {
                 DataAvailabilityMode::L1 => 0,
@@ -192,7 +192,6 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
                 ..native_tx_info
             };
         }
-        dbg!(&native_tx_info.account_contract_address.to_string());
 
         let caller_address = contract_address_to_felt(self.caller_address);
         let contract_address = contract_address_to_felt(self.contract_address);

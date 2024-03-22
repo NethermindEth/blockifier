@@ -554,8 +554,6 @@ fn test_get_execution_info(
     let nonce = Nonce(stark_felt!(3_u16));
     let sender_address = test_contract_address;
 
-    dbg!(&sender_address.to_string());
-
     let expected_tx_info: Vec<StarkFelt>;
     let mut expected_resource_bounds: Vec<StarkFelt> = vec![];
     let tx_info: TransactionInfo;
