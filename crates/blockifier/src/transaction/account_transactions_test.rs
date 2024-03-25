@@ -25,7 +25,7 @@ use crate::context::BlockContext;
 use crate::execution::contract_class::{ContractClass, ContractClassV1};
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt};
+use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
 use crate::fee::fee_utils::{calculate_tx_gas_vector, get_fee_by_gas_vector};
 use crate::fee::gas_usage::estimate_minimal_gas_vector;
 use crate::state::cached_state::{CachedState, StateChangesCount};
@@ -1016,7 +1016,7 @@ fn test_count_actual_storage_changes(
     let mut nonce_manager = NonceManager::default();
 
     let sequencer_address = block_context.block_info.sequencer_address;
-    let initial_sequencer_balance = stark_felt_to_felt(
+    let initial_sequencer_balance = stark_felt_to_felt_252(
         state.get_fee_token_balance(sequencer_address, fee_token_address).unwrap().0,
     );
 

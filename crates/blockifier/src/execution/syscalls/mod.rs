@@ -25,7 +25,7 @@ use crate::execution::deprecated_syscalls::DeprecatedSyscallSelector;
 use crate::execution::entry_point::{CallEntryPoint, CallType, ConstructorContext};
 use crate::execution::execution_utils::{
     execute_deployment, felt_252_to_stark_felt, felt_from_ptr, stark_felt_from_ptr,
-    stark_felt_to_felt, write_felt, write_maybe_relocatable, write_stark_felt, ReadOnlySegment,
+    stark_felt_to_felt_252, write_felt, write_maybe_relocatable, write_stark_felt, ReadOnlySegment,
 };
 use crate::execution::syscalls::hint_processor::{INVALID_INPUT_LENGTH_ERROR, OUT_OF_GAS_ERROR};
 use crate::transaction::transaction_utils::update_remaining_gas;
@@ -92,7 +92,7 @@ impl<T: SyscallResponse> SyscallResponse for SyscallResponseWrapper<T> {
                 let revert_reason_start = vm.add_memory_segment();
                 let revert_reason_end = vm.load_data(
                     revert_reason_start,
-                    &error_data.into_iter().map(stark_felt_to_felt).map(Into::into).collect(),
+                    &error_data.into_iter().map(stark_felt_to_felt_252).map(Into::into).collect(),
                 )?;
 
                 // Write the start and end pointers of the error data.

@@ -12,7 +12,7 @@ use starknet_api::StarknetApiError;
 use starknet_crypto::FieldElement;
 use thiserror::Error;
 
-use crate::execution::execution_utils::stark_felt_to_felt;
+use crate::execution::execution_utils::stark_felt_to_felt_252;
 use crate::state::errors::StateError;
 use crate::state::state_api::StateReader;
 
@@ -82,7 +82,7 @@ impl SierraType for SierraU128 {
         contract_address: &ContractAddress,
         key: &StorageKey,
     ) -> SierraTypeResult<Self> {
-        let val_as_felt = stark_felt_to_felt(state.get_storage_at(*contract_address, *key)?);
+        let val_as_felt = stark_felt_to_felt_252(state.get_storage_at(*contract_address, *key)?);
         Ok(Self { val: felt_to_u128(&val_as_felt)? })
     }
 }

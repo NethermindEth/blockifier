@@ -6,7 +6,7 @@ use starknet_api::hash::{pedersen_hash, StarkFelt, StarkHash};
 use starknet_api::state::StorageKey;
 
 use crate::abi::constants;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt};
+use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
 
 #[cfg(test)]
 #[path = "abi_utils_test.rs"]
@@ -45,7 +45,7 @@ pub fn get_storage_var_address(storage_var_name: &str, args: &[StarkFelt]) -> St
     let storage_key_hash =
         args.iter().fold(storage_var_name_hash, |res, arg| pedersen_hash(&res, arg));
 
-    let storage_key = stark_felt_to_felt(storage_key_hash)
+    let storage_key = stark_felt_to_felt_252(storage_key_hash)
         .mod_floor(&Felt252::from_bytes_be(&L2_ADDRESS_UPPER_BOUND.to_bytes_be()));
 
     StorageKey::try_from(felt_252_to_stark_felt(&storage_key))

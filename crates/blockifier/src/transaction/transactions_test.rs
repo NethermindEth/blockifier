@@ -34,7 +34,7 @@ use crate::execution::call_info::{
 use crate::execution::contract_class::{ContractClass, ContractClassV0, ContractClassV1};
 use crate::execution::entry_point::{CallEntryPoint, CallType};
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt};
+use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
 use crate::execution::syscalls::hint_processor::EmitEventError;
 use crate::fee::fee_utils::calculate_tx_fee;
 use crate::fee::gas_usage::{
@@ -677,10 +677,10 @@ fn test_invoke_tx_advanced_operations(
 
     let expected_counters = [
         felt_252_to_stark_felt(
-            &(stark_felt_to_felt(expected_counters[0]) + signature_values[0].clone()),
+            &(stark_felt_to_felt_252(expected_counters[0]) + signature_values[0].clone()),
         ),
         felt_252_to_stark_felt(
-            &(stark_felt_to_felt(expected_counters[1]) + signature_values[1].clone()),
+            &(stark_felt_to_felt_252(expected_counters[1]) + signature_values[1].clone()),
         ),
     ];
     let next_nonce = nonce_manager.next(account_address);
