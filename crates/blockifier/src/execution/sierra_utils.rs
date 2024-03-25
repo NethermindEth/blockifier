@@ -169,11 +169,11 @@ pub fn wrap_syscall_handler(syscall_handler: &mut NativeSyscallHandler<'_>) -> S
     SyscallHandlerMeta::new(syscall_handler)
 }
 
-pub fn stark_felt_to_felt(stark_felt: StarkFelt) -> Felt {
+pub fn stark_felt_to_felt_native(stark_felt: StarkFelt) -> Felt {
     Felt::from_bytes_be_slice(stark_felt.bytes())
 }
 
-pub fn felt_to_stark_felt(felt: Felt) -> StarkFelt {
+pub fn felt_native_to_stark_felt(felt: Felt) -> StarkFelt {
     StarkFelt::new(felt.to_bytes_be()).unwrap()
 }
 
@@ -185,7 +185,7 @@ pub fn contract_entrypoint_to_entrypoint_selector(
     entrypoint: &ContractEntryPoint,
 ) -> EntryPointSelector {
     let selector_felt = Felt::from_bytes_be_slice(&entrypoint.selector.to_be_bytes());
-    EntryPointSelector(felt_to_stark_felt(selector_felt))
+    EntryPointSelector(felt_native_to_stark_felt(selector_felt))
 }
 
 pub fn chain_id_to_felt(chain_id: &ChainId) -> Result<Felt, FromStrError> {
@@ -197,7 +197,7 @@ pub fn parse_stark_felt_string(felt: StarkFelt) -> String {
 }
 
 fn stark_felts_to_felts(data: &[StarkFelt]) -> Vec<Felt> {
-    data.iter().map(|stark_felt| stark_felt_to_felt(*stark_felt)).collect_vec()
+    data.iter().map(|stark_felt| stark_felt_to_felt_native(*stark_felt)).collect_vec()
 }
 
 pub fn run_native_executor(
@@ -249,7 +249,7 @@ pub fn create_callinfo(
         call,
         execution: CallExecution {
             retdata: Retdata(
-                run_result.return_values.into_iter().map(felt_to_stark_felt).collect_vec(),
+                run_result.return_values.into_iter().map(felt_native_to_stark_felt).collect_vec(),
             ),
             events,
             l2_to_l1_messages,
@@ -319,7 +319,7 @@ where
         // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
         Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
         Err(SyscallExecutionError::SyscallError { error_data }) => {
-            Err(error_data.iter().map(|felt| stark_felt_to_felt(*felt)).collect())
+            Err(error_data.iter().map(|felt| stark_felt_to_felt_native(*felt)).collect())
         }
         Err(_) => unreachable!(
             "Can't receive an error other than SyscallError from `secp_new_unchecked`."
@@ -344,7 +344,7 @@ pub fn calculate_resource_bounds(
             };
 
             ResourceBounds {
-                resource: stark_felt_to_felt(resource),
+                resource: stark_felt_to_felt_native(resource),
                 max_amount: resource_bound.max_amount,
                 max_price_per_unit: resource_bound.max_price_per_unit,
             }
@@ -433,7 +433,7 @@ mod sierra_tests {
 
         let felt = Felt::from(NUM);
         let expected_stark_felt = StarkFelt::from_u128(NUM);
-        let actual_stark_felt = felt_to_stark_felt(felt);
+        let actual_stark_felt = felt_native_to_stark_felt(felt);
 
         assert_eq!(expected_stark_felt, actual_stark_felt);
     }
@@ -444,7 +444,7 @@ mod sierra_tests {
 
         let stark_felt = StarkFelt::from_u128(NUM);
         let expected_felt = Felt::from(NUM);
-        let actual_felt = stark_felt_to_felt(stark_felt);
+        let actual_felt = stark_felt_to_felt_native(stark_felt);
 
         assert_eq!(expected_felt, actual_felt);
     }
