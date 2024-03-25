@@ -38,7 +38,7 @@ use crate::execution::contract_class::{ContractClass, ContractClassV0};
 use crate::execution::entry_point::{
     CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
 };
-use crate::execution::execution_utils::{execute_deployment, felt_to_stark_felt}; /* TODO rename to felt252_to_stark_felt */
+use crate::execution::execution_utils::{execute_deployment, felt_252_to_stark_felt}; /* TODO rename to felt252_to_stark_felt */
 use crate::execution::sierra_utils::{
     contract_address_to_felt, felt_to_starkfelt, starkfelt_to_felt,
 };
@@ -172,7 +172,7 @@ impl NonceManager {
     pub fn next(&mut self, account_address: ContractAddress) -> Nonce {
         let zero = Felt252::zero();
         let next_felt252 = self.next_nonce.get(&account_address).unwrap_or(&zero);
-        let next = Nonce(felt_to_stark_felt(next_felt252));
+        let next = Nonce(felt_252_to_stark_felt(next_felt252));
         self.next_nonce.insert(account_address, Felt252::one() + next_felt252);
         next
     }

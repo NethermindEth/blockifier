@@ -6,7 +6,7 @@ use num_traits::{One, Zero};
 use pretty_assertions::assert_eq;
 use starknet_api::hash::StarkFelt;
 
-use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
+use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt};
 
 fn starkfelt_to_felt_pairs() -> Vec<(StarkFelt, Felt252)> {
     // The STARK prime is 2 ^ 251 + 17 * 2 ^ 192 + 1.
@@ -42,6 +42,6 @@ fn test_stark_felt_to_felt() {
 #[test]
 fn test_felt_to_stark_felt() {
     for (equivalent_stark_felt, felt) in starkfelt_to_felt_pairs() {
-        assert_eq!(felt_to_stark_felt(&felt), equivalent_stark_felt);
+        assert_eq!(felt_252_to_stark_felt(&felt), equivalent_stark_felt);
     }
 }

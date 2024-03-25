@@ -9,7 +9,7 @@ use starknet_api::transaction::{Calldata, Fee, TransactionSignature, Transaction
 
 use crate::context::{BlockContext, ChainInfo};
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
+use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt};
 use crate::fee::fee_utils::{calculate_tx_fee, calculate_tx_gas_vector, get_fee_by_gas_vector};
 use crate::invoke_tx_args;
 use crate::state::cached_state::CachedState;
@@ -609,7 +609,7 @@ fn test_simulate_validate_charge_fee_post_execution(
         "transfer",
         &[
             recipient, // Calldata: to.
-            felt_to_stark_felt(&transfer_amount),
+            felt_252_to_stark_felt(&transfer_amount),
             stark_felt!(0_u8),
         ],
     );

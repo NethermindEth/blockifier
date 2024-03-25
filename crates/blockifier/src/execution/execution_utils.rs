@@ -46,7 +46,7 @@ pub fn stark_felt_to_felt(stark_felt: StarkFelt) -> Felt252 {
     Felt252::from_bytes_be(stark_felt.bytes())
 }
 
-pub fn felt_to_stark_felt(felt: &Felt252) -> StarkFelt {
+pub fn felt_252_to_stark_felt(felt: &Felt252) -> StarkFelt {
     let biguint = format!("{:#x}", felt.to_biguint());
     StarkFelt::try_from(biguint.as_str()).expect("Felt252 must be in StarkFelt's range.")
 }
@@ -128,7 +128,7 @@ pub fn stark_felt_from_ptr(
     vm: &VirtualMachine,
     ptr: &mut Relocatable,
 ) -> Result<StarkFelt, VirtualMachineError> {
-    Ok(felt_to_stark_felt(&felt_from_ptr(vm, ptr)?))
+    Ok(felt_252_to_stark_felt(&felt_from_ptr(vm, ptr)?))
 }
 
 pub fn felt_from_ptr(
@@ -156,7 +156,7 @@ pub fn felt_range_from_ptr(
 ) -> Result<Vec<StarkFelt>, VirtualMachineError> {
     let values = vm.get_integer_range(ptr, size)?;
     // Extract values as `StarkFelt`.
-    let values = values.into_iter().map(|felt| felt_to_stark_felt(felt.as_ref())).collect();
+    let values = values.into_iter().map(|felt| felt_252_to_stark_felt(felt.as_ref())).collect();
     Ok(values)
 }
 
