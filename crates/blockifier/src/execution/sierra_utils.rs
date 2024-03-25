@@ -169,11 +169,11 @@ pub fn wrap_syscall_handler(syscall_handler: &mut NativeSyscallHandler<'_>) -> S
     SyscallHandlerMeta::new(syscall_handler)
 }
 
-pub fn starkfelt_to_felt(starkfelt: StarkFelt) -> Felt {
-    Felt::from_bytes_be_slice(starkfelt.bytes())
+pub fn stark_felt_to_felt(stark_felt: StarkFelt) -> Felt {
+    Felt::from_bytes_be_slice(stark_felt.bytes())
 }
 
-pub fn felt_to_starkfelt(felt: Felt) -> StarkFelt {
+pub fn felt_to_stark_felt(felt: Felt) -> StarkFelt {
     StarkFelt::new(felt.to_bytes_be()).unwrap()
 }
 
@@ -185,19 +185,19 @@ pub fn contract_entrypoint_to_entrypoint_selector(
     entrypoint: &ContractEntryPoint,
 ) -> EntryPointSelector {
     let selector_felt = Felt::from_bytes_be_slice(&entrypoint.selector.to_be_bytes());
-    EntryPointSelector(felt_to_starkfelt(selector_felt))
+    EntryPointSelector(felt_to_stark_felt(selector_felt))
 }
 
 pub fn chain_id_to_felt(chain_id: &ChainId) -> Result<Felt, FromStrError> {
     Felt::from_hex(&chain_id.as_hex())
 }
 
-pub fn parse_starkfelt_string(felt: StarkFelt) -> String {
+pub fn parse_stark_felt_string(felt: StarkFelt) -> String {
     String::from_utf8(felt.bytes().into()).unwrap()
 }
 
-fn starkfelts_to_felts(data: &[StarkFelt]) -> Vec<Felt> {
-    data.iter().map(|starkfelt| starkfelt_to_felt(*starkfelt)).collect_vec()
+fn stark_felts_to_felts(data: &[StarkFelt]) -> Vec<Felt> {
+    data.iter().map(|stark_felt| stark_felt_to_felt(*stark_felt)).collect_vec()
 }
 
 pub fn run_native_executor(
@@ -209,13 +209,13 @@ pub fn run_native_executor(
     let execution_result = match native_executor {
         NativeExecutor::Aot(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
-            &starkfelts_to_felts(&call.calldata.0),
+            &stark_felts_to_felts(&call.calldata.0),
             Some(call.initial_gas.into()),
             Some(syscall_handler),
         ),
         NativeExecutor::Jit(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
-            &starkfelts_to_felts(&call.calldata.0),
+            &stark_felts_to_felts(&call.calldata.0),
             Some(call.initial_gas.into()),
             Some(syscall_handler),
         ),
@@ -249,7 +249,7 @@ pub fn create_callinfo(
         call,
         execution: CallExecution {
             retdata: Retdata(
-                run_result.return_values.into_iter().map(felt_to_starkfelt).collect_vec(),
+                run_result.return_values.into_iter().map(felt_to_stark_felt).collect_vec(),
             ),
             events,
             l2_to_l1_messages,
@@ -319,7 +319,7 @@ where
         // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
         Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
         Err(SyscallExecutionError::SyscallError { error_data }) => {
-            Err(error_data.iter().map(|felt| starkfelt_to_felt(*felt)).collect())
+            Err(error_data.iter().map(|felt| stark_felt_to_felt(*felt)).collect())
         }
         Err(_) => unreachable!(
             "Can't receive an error other than SyscallError from `secp_new_unchecked`."
@@ -344,7 +344,7 @@ pub fn calculate_resource_bounds(
             };
 
             ResourceBounds {
-                resource: starkfelt_to_felt(resource),
+                resource: stark_felt_to_felt(resource),
                 max_amount: resource_bound.max_amount,
                 max_price_per_unit: resource_bound.max_price_per_unit,
             }
@@ -384,22 +384,22 @@ mod sierra_tests {
             hex
         };
 
-        let starkfelt_str = StarkFelt::try_from(expected_string_hex.as_str()).unwrap();
-        let actual_string = parse_starkfelt_string(starkfelt_str);
+        let stark_felt_str = StarkFelt::try_from(expected_string_hex.as_str()).unwrap();
+        let actual_string = parse_stark_felt_string(stark_felt_str);
 
         assert_eq!(actual_string.trim_matches('\0'), EXPECTED_STRING);
     }
 
     #[test]
-    fn test_starkfelts_to_felts() {
-        let starkfelts = vec![
+    fn test_stark_felts_to_felts() {
+        let stark_felts = vec![
             StarkFelt::try_from("0x01").unwrap(),
             StarkFelt::try_from("0x02").unwrap(),
             StarkFelt::try_from("0x03").unwrap(),
         ];
         let expected_felts = vec![Felt::from(1_u64), Felt::from(2_u64), Felt::from(3_u64)];
 
-        let actual_felts = starkfelts_to_felts(&starkfelts);
+        let actual_felts = stark_felts_to_felts(&stark_felts);
 
         assert_eq!(actual_felts, expected_felts);
     }
@@ -428,23 +428,23 @@ mod sierra_tests {
     }
 
     #[test]
-    fn test_felt_to_starkfelt() {
+    fn test_felt_to_stark_felt() {
         const NUM: u128 = 123;
 
         let felt = Felt::from(NUM);
-        let expected_starkfelt = StarkFelt::from_u128(NUM);
-        let actual_starkfelt = felt_to_starkfelt(felt);
+        let expected_stark_felt = StarkFelt::from_u128(NUM);
+        let actual_stark_felt = felt_to_stark_felt(felt);
 
-        assert_eq!(expected_starkfelt, actual_starkfelt);
+        assert_eq!(expected_stark_felt, actual_stark_felt);
     }
 
     #[test]
-    fn test_starkfelt_to_felt() {
+    fn test_stark_felt_to_felt() {
         const NUM: u128 = 123;
 
-        let starkfelt = StarkFelt::from_u128(NUM);
+        let stark_felt = StarkFelt::from_u128(NUM);
         let expected_felt = Felt::from(NUM);
-        let actual_felt = starkfelt_to_felt(starkfelt);
+        let actual_felt = stark_felt_to_felt(stark_felt);
 
         assert_eq!(expected_felt, actual_felt);
     }
