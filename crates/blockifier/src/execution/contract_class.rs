@@ -36,7 +36,7 @@ use crate::abi::abi_utils::selector_from_name;
 use crate::abi::constants::{self, CONSTRUCTOR_ENTRY_POINT_NAME};
 use crate::execution::entry_point::CallEntryPoint;
 use crate::execution::errors::{ContractClassError, PreExecutionError};
-use crate::execution::execution_utils::{felt_252_to_stark_felt, sn_api_to_cairo_vm_program};
+use crate::execution::execution_utils::{felt_to_stark_felt, sn_api_to_cairo_vm_program};
 
 /// Represents a runnable Starknet contract class (meaning, the program is runnable by the VM).
 /// We wrap the actual class in an Arc to avoid cloning the program when cloning the class.
@@ -388,7 +388,7 @@ fn convert_entry_points_v1(
         .into_iter()
         .map(|ep| -> Result<_, ProgramError> {
             Ok(EntryPointV1 {
-                selector: EntryPointSelector(felt_252_to_stark_felt(&Felt252::from(ep.selector))),
+                selector: EntryPointSelector(felt_to_stark_felt(&Felt252::from(ep.selector))),
                 offset: EntryPointOffset(ep.offset),
                 builtins: ep.builtins.into_iter().map(|builtin| builtin + "_builtin").collect(),
             })

@@ -25,7 +25,7 @@ use crate::context::BlockContext;
 use crate::execution::contract_class::{ContractClass, ContractClassV1};
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
+use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
 use crate::fee::fee_utils::{calculate_tx_gas_vector, get_fee_by_gas_vector};
 use crate::fee::gas_usage::estimate_minimal_gas_vector;
 use crate::state::cached_state::{CachedState, StateChangesCount};
@@ -1016,7 +1016,7 @@ fn test_count_actual_storage_changes(
     let mut nonce_manager = NonceManager::default();
 
     let sequencer_address = block_context.block_info.sequencer_address;
-    let initial_sequencer_balance = stark_felt_to_felt_252(
+    let initial_sequencer_balance = stark_felt_to_felt(
         state.get_fee_token_balance(sequencer_address, fee_token_address).unwrap().0,
     );
 
@@ -1032,7 +1032,7 @@ fn test_count_actual_storage_changes(
     let transfer_calldata = create_calldata(
         fee_token_address,
         TRANSFER_ENTRY_POINT_NAME,
-        &[recipient, felt_252_to_stark_felt(&transfer_amount), stark_felt!(0_u8)],
+        &[recipient, felt_to_stark_felt(&transfer_amount), stark_felt!(0_u8)],
     );
 
     // Run transactions; using transactional state to count only storage changes of the current
@@ -1058,7 +1058,7 @@ fn test_count_actual_storage_changes(
     let mut expected_sequencer_total_fee = initial_sequencer_balance + Felt252::from(fee_1.0);
     let mut expected_sequencer_fee_update = (
         (fee_token_address, sequencer_fee_token_var_address),
-        felt_252_to_stark_felt(&expected_sequencer_total_fee),
+        felt_to_stark_felt(&expected_sequencer_total_fee),
     );
     let mut account_balance = BALANCE - fee_1.0;
     let account_balance_storage_change =
@@ -1099,7 +1099,7 @@ fn test_count_actual_storage_changes(
     let state_changes_2 = state.get_actual_state_changes().unwrap();
 
     expected_sequencer_total_fee += Felt252::from(fee_2.0);
-    expected_sequencer_fee_update.1 = felt_252_to_stark_felt(&expected_sequencer_total_fee);
+    expected_sequencer_fee_update.1 = felt_to_stark_felt(&expected_sequencer_total_fee);
     account_balance -= fee_2.0;
     let account_balance_storage_change =
         ((fee_token_address, account_fee_token_var_address), stark_felt!(account_balance));
@@ -1136,11 +1136,11 @@ fn test_count_actual_storage_changes(
     let state_changes_transfer = state.get_actual_state_changes().unwrap();
     let transfer_receipient_storage_change = (
         (fee_token_address, get_fee_token_var_address(contract_address!(recipient))),
-        felt_252_to_stark_felt(&transfer_amount),
+        felt_to_stark_felt(&transfer_amount),
     );
 
     expected_sequencer_total_fee += Felt252::from(fee_transfer.0);
-    expected_sequencer_fee_update.1 = felt_252_to_stark_felt(&expected_sequencer_total_fee);
+    expected_sequencer_fee_update.1 = felt_to_stark_felt(&expected_sequencer_total_fee);
     account_balance -= fee_transfer.0 + 1; // Reduce the fee and the transfered amount (1).
     let account_balance_storage_change =
         ((fee_token_address, account_fee_token_var_address), stark_felt!(account_balance));

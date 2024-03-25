@@ -24,8 +24,8 @@ use crate::execution::contract_class::ContractClass;
 use crate::execution::deprecated_syscalls::DeprecatedSyscallSelector;
 use crate::execution::entry_point::{CallEntryPoint, CallType, ConstructorContext};
 use crate::execution::execution_utils::{
-    execute_deployment, felt_252_to_stark_felt, felt_from_ptr, stark_felt_from_ptr,
-    stark_felt_to_felt_252, write_felt, write_maybe_relocatable, write_stark_felt, ReadOnlySegment,
+    execute_deployment, felt_from_ptr, felt_to_stark_felt, stark_felt_from_ptr, stark_felt_to_felt,
+    write_felt, write_maybe_relocatable, write_stark_felt, ReadOnlySegment,
 };
 use crate::execution::syscalls::hint_processor::{INVALID_INPUT_LENGTH_ERROR, OUT_OF_GAS_ERROR};
 use crate::transaction::transaction_utils::update_remaining_gas;
@@ -63,7 +63,7 @@ impl<T: SyscallRequest> SyscallRequest for SyscallRequestWrapper<T> {
         let gas_counter = felt_from_ptr(vm, ptr)?;
         let gas_counter =
             gas_counter.to_u64().ok_or_else(|| SyscallExecutionError::InvalidSyscallInput {
-                input: felt_252_to_stark_felt(&gas_counter),
+                input: felt_to_stark_felt(&gas_counter),
                 info: String::from("Unexpected gas."),
             })?;
         Ok(Self { gas_counter, request: T::read(vm, ptr)? })
@@ -92,7 +92,7 @@ impl<T: SyscallResponse> SyscallResponse for SyscallResponseWrapper<T> {
                 let revert_reason_start = vm.add_memory_segment();
                 let revert_reason_end = vm.load_data(
                     revert_reason_start,
-                    &error_data.into_iter().map(stark_felt_to_felt_252).map(Into::into).collect(),
+                    &error_data.into_iter().map(stark_felt_to_felt).map(Into::into).collect(),
                 )?;
 
                 // Write the start and end pointers of the error data.
@@ -347,7 +347,7 @@ impl SyscallRequest for GetBlockHashRequest {
         let felt = felt_from_ptr(vm, ptr)?;
         let block_number = BlockNumber(felt.to_u64().ok_or_else(|| {
             SyscallExecutionError::InvalidSyscallInput {
-                input: felt_252_to_stark_felt(&felt),
+                input: felt_to_stark_felt(&felt),
                 info: String::from("Block number must fit within 64 bits."),
             }
         })?);
@@ -716,7 +716,7 @@ pub fn keccak(
     for chunk in data.chunks(KECCAK_FULL_RATE_IN_WORDS) {
         for (i, val) in chunk.iter().enumerate() {
             state[i] ^= val.to_u64().ok_or_else(|| SyscallExecutionError::InvalidSyscallInput {
-                input: felt_252_to_stark_felt(val),
+                input: felt_to_stark_felt(val),
                 info: String::from("Invalid input for the keccak syscall."),
             })?;
         }

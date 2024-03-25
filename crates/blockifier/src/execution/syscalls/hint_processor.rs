@@ -30,7 +30,7 @@ use crate::execution::common_hints::{ExecutionMode, HintExecutionResult};
 use crate::execution::entry_point::{CallEntryPoint, CallType, EntryPointExecutionContext};
 use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::execution_utils::{
-    felt_range_from_ptr, max_fee_for_execution_info, stark_felt_from_ptr, stark_felt_to_felt_252,
+    felt_range_from_ptr, max_fee_for_execution_info, stark_felt_from_ptr, stark_felt_to_felt,
     write_maybe_relocatable, ReadOnlySegment, ReadOnlySegments,
 };
 use crate::execution::syscalls::secp::{
@@ -511,9 +511,9 @@ impl<'a> SyscallHintProcessor<'a> {
         let additional_info: Vec<MaybeRelocatable> = vec![
             block_info_ptr.into(),
             tx_info_ptr.into(),
-            stark_felt_to_felt_252(*self.caller_address().0.key()).into(),
-            stark_felt_to_felt_252(*self.storage_address().0.key()).into(),
-            stark_felt_to_felt_252(self.entry_point_selector().0).into(),
+            stark_felt_to_felt(*self.caller_address().0.key()).into(),
+            stark_felt_to_felt(*self.storage_address().0.key()).into(),
+            stark_felt_to_felt(self.entry_point_selector().0).into(),
         ];
         let execution_info_segment_start_ptr =
             self.read_only_segments.allocate(vm, &additional_info)?;
@@ -562,8 +562,7 @@ impl<'a> SyscallHintProcessor<'a> {
         vm: &mut VirtualMachine,
         data: &[StarkFelt],
     ) -> SyscallResult<(Relocatable, Relocatable)> {
-        let data =
-            data.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt_252(x))).collect();
+        let data = data.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt(x))).collect();
         let data_segment_start_ptr = self.read_only_segments.allocate(vm, &data)?;
         let data_segment_end_ptr = (data_segment_start_ptr + data.len())?;
         Ok((data_segment_start_ptr, data_segment_end_ptr))
@@ -575,17 +574,17 @@ impl<'a> SyscallHintProcessor<'a> {
             &self.allocate_data_segment(vm, &tx_info.signature().0)?;
 
         let mut tx_data: Vec<MaybeRelocatable> = vec![
-            stark_felt_to_felt_252(tx_info.signed_version().0).into(),
-            stark_felt_to_felt_252(*tx_info.sender_address().0.key()).into(),
+            stark_felt_to_felt(tx_info.signed_version().0).into(),
+            stark_felt_to_felt(*tx_info.sender_address().0.key()).into(),
             max_fee_for_execution_info(tx_info).into(),
             tx_signature_start_ptr.into(),
             tx_signature_end_ptr.into(),
-            stark_felt_to_felt_252((tx_info).transaction_hash().0).into(),
+            stark_felt_to_felt((tx_info).transaction_hash().0).into(),
             Felt252::from_bytes_be(
                 self.context.tx_context.block_context.chain_info.chain_id.0.as_bytes(),
             )
             .into(),
-            stark_felt_to_felt_252((tx_info).nonce().0).into(),
+            stark_felt_to_felt((tx_info).nonce().0).into(),
         ];
 
         match tx_info {
@@ -605,8 +604,8 @@ impl<'a> SyscallHintProcessor<'a> {
                     Felt252::from(context.tip.0).into(),
                     tx_paymaster_data_start_ptr.into(),
                     tx_paymaster_data_end_ptr.into(),
-                    stark_felt_to_felt_252(context.nonce_data_availability_mode.into()).into(),
-                    stark_felt_to_felt_252(context.fee_data_availability_mode.into()).into(),
+                    stark_felt_to_felt(context.nonce_data_availability_mode.into()).into(),
+                    stark_felt_to_felt(context.fee_data_availability_mode.into()).into(),
                     tx_account_deployment_data_start_ptr.into(),
                     tx_account_deployment_data_end_ptr.into(),
                 ]);

@@ -18,8 +18,8 @@ use crate::execution::entry_point::{
 };
 use crate::execution::errors::{EntryPointExecutionError, PostExecutionError, PreExecutionError};
 use crate::execution::execution_utils::{
-    read_execution_retdata, stark_felt_to_felt_252, write_maybe_relocatable, write_stark_felt,
-    Args, ReadOnlySegments,
+    read_execution_retdata, stark_felt_to_felt, write_maybe_relocatable, write_stark_felt, Args,
+    ReadOnlySegments,
 };
 use crate::execution::syscalls::hint_processor::SyscallHintProcessor;
 use crate::state::state_api::State;
@@ -269,7 +269,7 @@ pub fn prepare_call_arguments(
     // Prepare calldata arguments.
     let calldata = &call.calldata.0;
     let calldata: Vec<MaybeRelocatable> =
-        calldata.iter().map(|&arg| MaybeRelocatable::from(stark_felt_to_felt_252(arg))).collect();
+        calldata.iter().map(|&arg| MaybeRelocatable::from(stark_felt_to_felt(arg))).collect();
 
     let calldata_start_ptr = read_only_segments.allocate(vm, &calldata)?;
     let calldata_end_ptr = MaybeRelocatable::from((calldata_start_ptr + calldata.len())?);

@@ -41,7 +41,7 @@ use crate::execution::deprecated_syscalls::{
 use crate::execution::entry_point::{CallEntryPoint, CallType, EntryPointExecutionContext};
 use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::execution_utils::{
-    felt_range_from_ptr, max_fee_for_execution_info, stark_felt_from_ptr, stark_felt_to_felt_252,
+    felt_range_from_ptr, max_fee_for_execution_info, stark_felt_from_ptr, stark_felt_to_felt,
     ReadOnlySegment, ReadOnlySegments,
 };
 use crate::execution::hint_code;
@@ -333,7 +333,7 @@ impl<'a> DeprecatedSyscallHintProcessor<'a> {
     ) -> DeprecatedSyscallResult<Relocatable> {
         let signature = &self.context.tx_context.tx_info.signature().0;
         let signature =
-            signature.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt_252(x))).collect();
+            signature.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt(x))).collect();
         let signature_segment_start_ptr = self.read_only_segments.allocate(vm, &signature)?;
 
         Ok(signature_segment_start_ptr)
@@ -347,14 +347,14 @@ impl<'a> DeprecatedSyscallHintProcessor<'a> {
         let TransactionContext { block_context, tx_info } = self.context.tx_context.as_ref();
         let tx_signature_length = tx_info.signature().0.len();
         let tx_info: Vec<MaybeRelocatable> = vec![
-            stark_felt_to_felt_252(tx_info.signed_version().0).into(),
-            stark_felt_to_felt_252(*tx_info.sender_address().0.key()).into(),
+            stark_felt_to_felt(tx_info.signed_version().0).into(),
+            stark_felt_to_felt(*tx_info.sender_address().0.key()).into(),
             max_fee_for_execution_info(tx_info).into(),
             tx_signature_length.into(),
             tx_signature_start_ptr.into(),
-            stark_felt_to_felt_252(tx_info.transaction_hash().0).into(),
+            stark_felt_to_felt(tx_info.transaction_hash().0).into(),
             Felt252::from_bytes_be(block_context.chain_info.chain_id.0.as_bytes()).into(),
-            stark_felt_to_felt_252(tx_info.nonce().0).into(),
+            stark_felt_to_felt(tx_info.nonce().0).into(),
         ];
 
         let tx_info_start_ptr = self.read_only_segments.allocate(vm, &tx_info)?;
@@ -464,7 +464,7 @@ pub fn execute_inner_call(
         call.execute(syscall_handler.state, syscall_handler.resources, syscall_handler.context)?;
     let retdata = &call_info.execution.retdata.0;
     let retdata: Vec<MaybeRelocatable> =
-        retdata.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt_252(x))).collect();
+        retdata.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt(x))).collect();
     let retdata_segment_start_ptr = syscall_handler.read_only_segments.allocate(vm, &retdata)?;
 
     syscall_handler.inner_calls.push(call_info);

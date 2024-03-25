@@ -34,7 +34,7 @@ use crate::execution::call_info::{
 use crate::execution::contract_class::{ContractClass, ContractClassV0, ContractClassV1};
 use crate::execution::entry_point::{CallEntryPoint, CallType};
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
+use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
 use crate::execution::syscalls::hint_processor::EmitEventError;
 use crate::fee::fee_utils::calculate_tx_fee;
 use crate::fee::gas_usage::{
@@ -663,8 +663,7 @@ fn test_invoke_tx_advanced_operations(
 
     // Invoke add_signature_to_counters function.
     let signature_values = [Felt252::from(200_u64), Felt252::from(300_u64)];
-    let signature =
-        TransactionSignature(signature_values.iter().map(felt_252_to_stark_felt).collect());
+    let signature = TransactionSignature(signature_values.iter().map(felt_to_stark_felt).collect());
 
     let account_tx = account_invoke_tx(invoke_tx_args! {
         signature,
@@ -676,11 +675,11 @@ fn test_invoke_tx_advanced_operations(
     account_tx.execute(state, block_context, true, true).unwrap();
 
     let expected_counters = [
-        felt_252_to_stark_felt(
-            &(stark_felt_to_felt_252(expected_counters[0]) + signature_values[0].clone()),
+        felt_to_stark_felt(
+            &(stark_felt_to_felt(expected_counters[0]) + signature_values[0].clone()),
         ),
-        felt_252_to_stark_felt(
-            &(stark_felt_to_felt_252(expected_counters[1]) + signature_values[1].clone()),
+        felt_to_stark_felt(
+            &(stark_felt_to_felt(expected_counters[1]) + signature_values[1].clone()),
         ),
     ];
     let next_nonce = nonce_manager.next(account_address);
@@ -699,7 +698,7 @@ fn test_invoke_tx_advanced_operations(
     let account_tx = account_invoke_tx(invoke_tx_args! {
         nonce: next_nonce,
         calldata:
-            create_calldata(contract_address, "send_message", &[felt_252_to_stark_felt(&to_address)]),
+            create_calldata(contract_address, "send_message", &[felt_to_stark_felt(&to_address)]),
         ..base_tx_args
     });
     let execution_info = account_tx.execute(state, block_context, true, true).unwrap();
@@ -716,7 +715,7 @@ fn test_invoke_tx_advanced_operations(
     let expected_msg = OrderedL2ToL1Message {
         order: 0,
         message: MessageToL1 {
-            to_address: EthAddress::try_from(felt_252_to_stark_felt(&to_address)).unwrap(),
+            to_address: EthAddress::try_from(felt_to_stark_felt(&to_address)).unwrap(),
             payload: L2ToL1Payload(vec![stark_felt!(12_u32), stark_felt!(34_u32)]),
         },
     };
@@ -1615,19 +1614,19 @@ fn test_only_query_flag(#[case] only_query: bool) {
     let test_contract_address = test_contract.get_instance_address(0);
     let max_fee = Fee(MAX_FEE);
     let expected_tx_info = vec![
-        felt_252_to_stark_felt(&version), // Transaction version.
-        *sender_address.0.key(),          // Account address.
-        stark_felt!(max_fee.0),           // Max fee.
-        StarkFelt::ZERO,                  // Signature.
-        StarkFelt::ZERO,                  // Transaction hash.
+        felt_to_stark_felt(&version), // Transaction version.
+        *sender_address.0.key(),      // Account address.
+        stark_felt!(max_fee.0),       // Max fee.
+        StarkFelt::ZERO,              // Signature.
+        StarkFelt::ZERO,              // Transaction hash.
         stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
-        StarkFelt::ZERO,                  // Nonce.
-        StarkFelt::ZERO,                  // Length of resource bounds array.
-        StarkFelt::ZERO,                  // Tip.
-        StarkFelt::ZERO,                  // Paymaster data.
-        StarkFelt::ZERO,                  // Nonce DA.
-        StarkFelt::ZERO,                  // Fee DA.
-        StarkFelt::ZERO,                  // Account data.
+        StarkFelt::ZERO,              // Nonce.
+        StarkFelt::ZERO,              // Length of resource bounds array.
+        StarkFelt::ZERO,              // Tip.
+        StarkFelt::ZERO,              // Paymaster data.
+        StarkFelt::ZERO,              // Nonce DA.
+        StarkFelt::ZERO,              // Fee DA.
+        StarkFelt::ZERO,              // Account data.
     ];
     let entry_point_selector = selector_from_name("test_get_execution_info");
     let expected_call_info = vec![

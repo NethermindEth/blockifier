@@ -25,7 +25,7 @@ use crate::execution::call_info::{CallExecution, CallInfo, OrderedEvent, Retdata
 use crate::execution::common_hints::ExecutionMode;
 use crate::execution::entry_point::{CallEntryPoint, CallType};
 use crate::execution::errors::EntryPointExecutionError;
-use crate::execution::execution_utils::felt_252_to_stark_felt;
+use crate::execution::execution_utils::felt_to_stark_felt;
 use crate::execution::syscalls::hint_processor::EmitEventError;
 use crate::state::state_api::StateReader;
 use crate::test_utils::cached_state::{
@@ -473,12 +473,12 @@ fn test_tx_info(#[case] only_query: bool) {
     let nonce = Nonce(stark_felt!(3_u16));
     let sender_address = ContractAddress(patricia_key!(TEST_CONTRACT_ADDRESS));
     let expected_tx_info = calldata![
-        felt_252_to_stark_felt(&version), // Transaction version.
-        *sender_address.0.key(),          // Account address.
-        stark_felt!(max_fee.0),           // Max fee.
-        tx_hash.0,                        // Transaction hash.
+        felt_to_stark_felt(&version), // Transaction version.
+        *sender_address.0.key(),      // Account address.
+        stark_felt!(max_fee.0),       // Max fee.
+        tx_hash.0,                    // Transaction hash.
         stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
-        nonce.0                           // Nonce.
+        nonce.0                       // Nonce.
     ];
     let entry_point_selector = selector_from_name("test_get_tx_info");
     let entry_point_call = CallEntryPoint {

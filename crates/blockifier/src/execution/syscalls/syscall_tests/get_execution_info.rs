@@ -17,7 +17,7 @@ use crate::abi::abi_utils::selector_from_name;
 use crate::context::ChainInfo;
 use crate::execution::common_hints::ExecutionMode;
 use crate::execution::entry_point::CallEntryPoint;
-use crate::execution::execution_utils::{felt_252_to_stark_felt, stark_felt_to_felt_252};
+use crate::execution::execution_utils::{felt_to_stark_felt, stark_felt_to_felt};
 use crate::execution::syscalls::hint_processor::{L1_GAS, L2_GAS};
 use crate::test_utils::contracts::FeatureContract;
 use crate::test_utils::initial_test_state::test_state;
@@ -161,8 +161,8 @@ fn test_get_execution_info(
 
     if only_query {
         let simulate_version_base = Pow::pow(Felt252::from(2_u8), QUERY_VERSION_BASE_BIT);
-        let query_version = simulate_version_base + stark_felt_to_felt_252(version.0);
-        version = TransactionVersion(felt_252_to_stark_felt(&query_version));
+        let query_version = simulate_version_base + stark_felt_to_felt(version.0);
+        version = TransactionVersion(felt_to_stark_felt(&query_version));
     }
 
     let tx_hash = TransactionHash(stark_felt!(1991_u16));

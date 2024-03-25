@@ -16,7 +16,7 @@ use crate::execution::entry_point::{
 };
 use crate::execution::errors::{PostExecutionError, PreExecutionError};
 use crate::execution::execution_utils::{
-    read_execution_retdata, stark_felt_to_felt_252, Args, ReadOnlySegments,
+    read_execution_retdata, stark_felt_to_felt, Args, ReadOnlySegments,
 };
 use crate::state::state_api::State;
 
@@ -161,7 +161,7 @@ pub fn prepare_call_arguments(
 
     // Prepare called EP details.
     let entry_point_selector =
-        MaybeRelocatable::from(stark_felt_to_felt_252(call.entry_point_selector.0));
+        MaybeRelocatable::from(stark_felt_to_felt(call.entry_point_selector.0));
     args.push(CairoArg::from(entry_point_selector));
 
     // Prepare implicit arguments.
@@ -175,7 +175,7 @@ pub fn prepare_call_arguments(
     // Prepare calldata arguments.
     let calldata = &call.calldata.0;
     let calldata: Vec<MaybeRelocatable> =
-        calldata.iter().map(|&arg| MaybeRelocatable::from(stark_felt_to_felt_252(arg))).collect();
+        calldata.iter().map(|&arg| MaybeRelocatable::from(stark_felt_to_felt(arg))).collect();
     let calldata_length = MaybeRelocatable::from(calldata.len());
     args.push(CairoArg::from(calldata_length));
 

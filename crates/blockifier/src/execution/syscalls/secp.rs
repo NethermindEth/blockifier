@@ -16,7 +16,7 @@ use crate::execution::syscalls::hint_processor::{
     felt_to_bool, SyscallHintProcessor, INVALID_ARGUMENT,
 };
 use crate::execution::syscalls::{
-    felt_252_to_stark_felt, SyscallExecutionError, SyscallRequest, SyscallResponse, SyscallResult,
+    felt_to_stark_felt, SyscallExecutionError, SyscallRequest, SyscallResponse, SyscallResult,
     WriteResponseResult,
 };
 
@@ -126,7 +126,7 @@ where
     ) -> SyscallResult<&short_weierstrass::Affine<Curve>> {
         ec_point_id.to_usize().and_then(|id| self.points.get(id)).ok_or_else(|| {
             SyscallExecutionError::InvalidSyscallInput {
-                input: felt_252_to_stark_felt(&ec_point_id),
+                input: felt_to_stark_felt(&ec_point_id),
                 info: "Invalid Secp point ID".to_string(),
             }
         })
