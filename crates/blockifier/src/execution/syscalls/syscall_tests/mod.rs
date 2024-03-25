@@ -40,7 +40,7 @@ fn assert_contract_uses_native(class_hash: ClassHash, state: &dyn State) {
     assert_matches!(
         state
             .get_compiled_contract_class(class_hash)
-            .expect(&format!("Expected contract class at {class_hash}")),
+            .unwrap_or_else(|_| panic!("Expected contract class at {class_hash}")),
         ContractClass::V1Sierra(_)
     )
 }
@@ -49,7 +49,7 @@ fn assert_contract_uses_vm(class_hash: ClassHash, state: &dyn State) {
     assert_matches!(
         state
             .get_compiled_contract_class(class_hash)
-            .expect(&format!("Expected contract class at {class_hash}")),
+            .unwrap_or_else(|_| panic!("Expected contract class at {class_hash}")),
         ContractClass::V1(_) | ContractClass::V0(_)
     )
 }
