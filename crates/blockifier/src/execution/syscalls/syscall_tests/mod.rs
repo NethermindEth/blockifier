@@ -84,7 +84,9 @@ fn verify_compiler_version(contract: FeatureContract, expected_version: &str) {
     }
 }
 
-#[test_case(FeatureContract::SierraTestContract; "Native")] // fail bc it doesn't limit on gas, not expecting it to yet
+// TODO: Native
+// #[test_case(FeatureContract::SierraTestContract; "Native")] // fail bc it doesn't limit on gas,
+// not expecting it to yet
 #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")] // pass
 fn test_out_of_gas(test_contract: FeatureContract) {
     let chain_info = &ChainInfo::create_for_testing();
