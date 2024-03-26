@@ -3,8 +3,6 @@ description: 'Sets up LLVM and GMP libraries'
 
 runs:
   using: "composite"
-  env:
-    LLVM_PATH: /usr/lib/llvm-17
   steps:
     - name: add llvm deb repository
       uses: myci-actions/add-deb-repo@10
@@ -18,9 +16,9 @@ runs:
         sudo apt install -y libgmp3-dev
       shell: bash
       env:
-        MLIR_SYS_170_PREFIX: ${{ env.LLVM_PATH }}
-        LLVM_SYS_170_PREFIX: ${{ env.LLVM_PATH }}
-        TABLEGEN_170_PREFIX: ${{ env.LLVM_PATH }}
+        MLIR_SYS_170_PREFIX: '/usr/lib/llvm-17'
+        LLVM_SYS_170_PREFIX: '/usr/lib/llvm-17'
+        TABLEGEN_170_PREFIX: '/usr/lib/llvm-17'
     - name: Install cairo native runtime
       uses: actions/checkout@v3
       with:
