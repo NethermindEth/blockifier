@@ -108,7 +108,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         name: "Rust Toolchain Setup"
         with:
-          toolchain: nightly-2023-07-05
+          toolchain: nightly-2023-08-23
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep
       - uses: Swatinem/rust-cache@v2
@@ -120,4 +120,4 @@ jobs:
           cd crates/blockifier
           cargo udeps --all-features --all-targets
         env:
-          RUSTUP_TOOLCHAIN: nightly-2023-07-05
+          RUSTUP_TOOLCHAIN: nightly-2023-08-23
