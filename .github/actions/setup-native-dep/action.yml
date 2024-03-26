@@ -1,6 +1,10 @@
 name: 'Setup Cairo Native Dependencies'
 description: 'Sets up LLVM and GMP libraries'
 
+outputs:
+  cairo-native-runtime-libdir:
+      description: 'The path to the cairo native runtime library'
+      value: ${{ steps.set-env-vars.outputs.cairo-native-runtime-libdir }}
 runs:
   using: "composite"
   steps:
@@ -11,14 +15,11 @@ runs:
         repo-name: llvm-repo
         keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
     - name: Install LLVM and gmplib
+      shell: bash
       run: |
         sudo apt-get install llvm-17 llvm-17-dev llvm-17-runtime clang-17 clang-tools-17 lld-17 libpolly-17-dev libmlir-17-dev mlir-17-tools
         sudo apt install -y libgmp3-dev
-      shell: bash
-      env:
-        MLIR_SYS_170_PREFIX: '/usr/lib/llvm-17'
-        LLVM_SYS_170_PREFIX: '/usr/lib/llvm-17'
-        TABLEGEN_170_PREFIX: '/usr/lib/llvm-17'
+
     - name: Install cairo native runtime
       uses: actions/checkout@v3
       with:
@@ -26,10 +27,10 @@ runs:
         ref: "main"
         path: 'cairo_native'
     - name: Install cairo native runtime env vars
+      id: set-env-vars
       shell: bash
       run: |
         cd ./cairo_native/runtime &&
-        echo "CAIRO_NATIVE_RUNTIME_LIBDIR=$(pwd)/../target/release" >> $GITHUB_ENV &&
-        echo $CAIRO_NATIVE_RUNTIME_LIBDIR &&
+        echo "cairo-native-runtime-libdir=$(pwd)/../target/release" >> $GITHUB_OUTPUT &&
         cargo build --release &&
         cd ../..
