@@ -90,7 +90,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         uses: ./.github/actions/setup-native-dep
-        run: |
+        run: | 
           cd crates/blockifier 
           cargo test --test erc20_tests --features testing
 
