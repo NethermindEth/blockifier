@@ -3,16 +3,35 @@ description: 'Sets up LLVM and GMP libraries'
 
 runs:
   using: "composite"
+  env:
+    LLVM_PATH: /usr/lib/llvm-17
   steps:
-   - name: add llvm deb repository
-     uses: myci-actions/add-deb-repo@10
-     with:
-       repo: deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main
-       repo-name: llvm-repo
-       keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
-   - name: Install LLVM
-     run: sudo apt-get install llvm-17 llvm-17-dev llvm-17-runtime clang-17 clang-tools-17 lld-17 libpolly-17-dev libmlir-17-dev mlir-17-tools
-     shell: bash
-   - name: Install gmplib
-     run: sudo apt install -y libgmp3-dev
-     shell: bash
+    - name: add llvm deb repository
+      uses: myci-actions/add-deb-repo@10
+      with:
+        repo: deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main
+        repo-name: llvm-repo
+        keys-asc: https://apt.llvm.org/llvm-snapshot.gpg.key
+    - name: Install LLVM and gmplib
+      run: |
+        sudo apt-get install llvm-17 llvm-17-dev llvm-17-runtime clang-17 clang-tools-17 lld-17 libpolly-17-dev libmlir-17-dev mlir-17-tools
+        sudo apt install -y libgmp3-dev
+      shell: bash
+      env:
+        MLIR_SYS_170_PREFIX: ${{ env.LLVM_PATH }}
+        LLVM_SYS_170_PREFIX: ${{ env.LLVM_PATH }}
+        TABLEGEN_170_PREFIX: ${{ env.LLVM_PATH }}
+    - name: Install cairo native runtime
+      uses: actions/checkout@v3
+      with:
+        repository: 'lambdaclass/cairo_native'
+        ref: "main"
+        path: 'cairo_native'
+    - name: Install cairo native runtime env vars
+      shell: bash
+      run: |
+        cd ./cairo_native/runtime &&
+        echo "CAIRO_NATIVE_RUNTIME_LIBDIR=$(pwd)/../target/release" >> $GITHUB_ENV &&
+        echo $CAIRO_NATIVE_RUNTIME_LIBDIR &&
+        cargo build --release &&
+        cd ../..
