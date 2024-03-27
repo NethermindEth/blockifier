@@ -57,6 +57,11 @@ jobs:
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep
       - run: scripts/clippy.sh
+        env:
+          CAIRO_NATIVE_RUNTIME_LIBDIR: ${{ steps.native-deps.outputs.cairo-native-runtime-libdir }}
+          MLIR_SYS_170_PREFIX: /usr/lib/llvm-17/
+          LLVM_SYS_170_PREFIX: /usr/lib/llvm-17/
+          TABLEGEN_170_PREFIX: /usr/lib/llvm-17/
 
   run-tests:
     runs-on: ubuntu-latest
