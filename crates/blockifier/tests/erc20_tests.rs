@@ -1,7 +1,7 @@
 // run with:
 // cargo test --test erc20_tests --features testing
 use blockifier::execution::sierra_utils::{
-    contract_address_to_felt, native_felt_to_stark_felt, native_stark_felt_to_felt,
+    contract_address_to_felt, native_felt_to_stark_felt, stark_felt_to_native_felt,
 };
 use blockifier::test_utils::*;
 use starknet_api::hash::StarkFelt;
@@ -62,7 +62,7 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -80,12 +80,12 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(balance_after_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_to.into()]),
-            vec![native_stark_felt_to_felt(balance_to_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
 
@@ -101,7 +101,7 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -121,7 +121,7 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -143,7 +143,7 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -161,12 +161,12 @@ mod transfer_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(balance_after_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_to.into()]),
-            vec![native_stark_felt_to_felt(balance_to_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_to_transfer), Felt::from(0u128)]
         );
 
         let event = context.get_event(0).unwrap();
@@ -177,7 +177,7 @@ mod transfer_tests {
             (
                 address_from.into(),
                 address_to.into(),
-                native_stark_felt_to_felt(balance_to_transfer),
+                stark_felt_to_native_felt(balance_to_transfer),
             )
         );
     }
@@ -211,7 +211,7 @@ mod allowance_tests {
 
         assert_eq!(
             context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
-            vec![native_stark_felt_to_felt(balance_to_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
 
@@ -239,7 +239,7 @@ mod allowance_tests {
 
         assert_eq!(
             context.call_entry_point("allowance", vec![address_from.into(), address_to.into()]),
-            vec![native_stark_felt_to_felt(balance_to_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_to_transfer), Felt::from(0u128)]
         );
 
         let event = context.get_event(0).unwrap();
@@ -250,7 +250,7 @@ mod allowance_tests {
             (
                 address_from.into(),
                 address_to.into(),
-                native_stark_felt_to_felt(balance_to_transfer),
+                stark_felt_to_native_felt(balance_to_transfer),
             )
         );
     }
@@ -274,7 +274,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -307,12 +307,12 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(balance_after_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_after_transfer), Felt::from(0u128)]
         );
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_to.into()]),
-            vec![native_stark_felt_to_felt(balance_to_transfer), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(balance_to_transfer), Felt::from(0u128)]
         );
     }
 
@@ -329,7 +329,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -364,7 +364,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -386,7 +386,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -421,7 +421,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -443,7 +443,7 @@ mod transfer_from_tests {
 
         assert_eq!(
             context.call_entry_point("balance_of", vec![address_from.into()]),
-            vec![native_stark_felt_to_felt(total_supply), Felt::from(0u128)]
+            vec![stark_felt_to_native_felt(total_supply), Felt::from(0u128)]
         );
 
         assert_eq!(
@@ -468,7 +468,7 @@ mod transfer_from_tests {
             (
                 address_from.into(),
                 address_spender.into(),
-                native_stark_felt_to_felt(balance_to_transfer),
+                stark_felt_to_native_felt(balance_to_transfer),
             )
         );
 
@@ -496,7 +496,7 @@ mod transfer_from_tests {
             (
                 address_from.into(),
                 address_to.into(),
-                native_stark_felt_to_felt(balance_to_transfer),
+                stark_felt_to_native_felt(balance_to_transfer),
             )
         );
     }

@@ -40,7 +40,7 @@ use crate::execution::entry_point::{
 };
 use crate::execution::execution_utils::{execute_deployment, felt_to_stark_felt}; /* TODO rename to felt252_to_stark_felt */
 use crate::execution::sierra_utils::{
-    contract_address_to_felt, native_felt_to_stark_felt, native_stark_felt_to_felt,
+    contract_address_to_felt, native_felt_to_stark_felt, stark_felt_to_native_felt,
 };
 use crate::execution::syscalls::hint_processor::{
     FAILED_TO_CALCULATE_CONTRACT_ADDRESS, FAILED_TO_EXECUTE_CALL,
@@ -482,8 +482,8 @@ pub fn deploy_contract(
     .map_err(|_| vec![Felt::from_hex(FAILED_TO_EXECUTE_CALL).unwrap()])?;
 
     let return_data =
-        call_info.execution.retdata.0.into_iter().map(native_stark_felt_to_felt).collect();
-    let contract_address_felt = native_stark_felt_to_felt(*calculated_contract_address.0.key());
+        call_info.execution.retdata.0.into_iter().map(stark_felt_to_native_felt).collect();
+    let contract_address_felt = stark_felt_to_native_felt(*calculated_contract_address.0.key());
     Ok((contract_address_felt, return_data))
 }
 
@@ -553,8 +553,8 @@ pub struct TestEvent {
 
 impl From<OrderedEvent> for TestEvent {
     fn from(value: OrderedEvent) -> Self {
-        let event_data = value.event.data.0.iter().map(|e| native_stark_felt_to_felt(*e)).collect();
-        let event_keys = value.event.keys.iter().map(|e| native_stark_felt_to_felt(e.0)).collect();
+        let event_data = value.event.data.0.iter().map(|e| stark_felt_to_native_felt(*e)).collect();
+        let event_keys = value.event.keys.iter().map(|e| stark_felt_to_native_felt(e.0)).collect();
         Self { data: event_data, keys: event_keys }
     }
 }
@@ -583,7 +583,7 @@ impl TestContext {
         calldata: Vec<StarkFelt>,
     ) -> Vec<Felt> {
         let result = self.call_entry_point_raw(entry_point_name, calldata).unwrap();
-        result.execution.retdata.0.iter().map(|felt| native_stark_felt_to_felt(*felt)).collect()
+        result.execution.retdata.0.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect()
     }
 
     pub fn call_entry_point_raw(
