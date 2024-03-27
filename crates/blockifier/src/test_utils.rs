@@ -582,7 +582,7 @@ impl TestContext {
         entry_point_name: &str,
         calldata: Vec<StarkFelt>,
     ) -> Vec<Felt> {
-        let result = self.call_entry_point_raw(entry_point_name, calldata);
+        let result = self.call_entry_point_raw(entry_point_name, calldata).unwrap();
         result.execution.retdata.0.iter().map(|felt| stark_felt_to_felt_native(*felt)).collect()
     }
 
