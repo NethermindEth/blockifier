@@ -87,6 +87,7 @@ pub fn execute_entry_point_call(
             ) {
                 Ok(res) => Ok(res),
                 Err(EntryPointExecutionError::NativeUnexpectedError { .. }) if fallback => {
+                    // Fallback to VM execution in case of an Error
                     let casm_contract_class =
                         contract_class.to_casm_contract_class().map_err(|e| {
                             EntryPointExecutionError::FailedToConvertSierraToCasm(e.to_string())
@@ -100,6 +101,9 @@ pub fn execute_entry_point_call(
                         resources,
                         context,
                     )
+                    .map_err(|e| {
+                        EntryPointExecutionError::NativeFallbackError { info: Box::new(e) }
+                    })
                 }
                 Err(e) => Err(e),
             }
