@@ -57,8 +57,13 @@ pub fn match_entrypoint(
 
     let cmp_selector_to_entrypoint =
         |selector: EntryPointSelector, entrypoint: &ContractEntryPoint| {
-            let padded_entrypint_selector = format!("{:064x}", entrypoint.selector);
-            selector.0.to_string() == padded_entrypint_selector
+            let entrypoint_selector_str = entrypoint.selector.to_str_radix(16);
+            let padded_selector_str = format!(
+                "0x{}{}",
+                "0".repeat(64 - entrypoint_selector_str.len()),
+                entrypoint_selector_str
+            );
+            selector.0.to_string() == padded_selector_str
         };
 
     entrypoints
