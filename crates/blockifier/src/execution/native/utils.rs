@@ -26,15 +26,17 @@ use starknet_api::state::StorageKey;
 use starknet_api::transaction::Resource;
 use starknet_types_core::felt::Felt;
 
-use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
-use super::entry_point::{CallEntryPoint, EntryPointExecutionResult};
-use super::errors::EntryPointExecutionError;
+use crate::execution::call_info::{
+    CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata,
+};
+use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionResult};
+use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
 use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
 use crate::transaction::objects::CurrentTransactionInfo;
 
 #[cfg(test)]
-#[path = "sierra_utils_test.rs"]
+#[path = "utils_test.rs"]
 pub mod test;
 
 // An arbitrary number, chosen to avoid accidentally aligning with actually calculated gas
@@ -65,7 +67,7 @@ pub fn match_entrypoint(
 
     entrypoints
         .iter()
-        .find(|entrypoint| cmp_selector_to_entrypoint(entrypoint_selector, *entrypoint))
+        .find(|entrypoint| cmp_selector_to_entrypoint(entrypoint_selector, entrypoint))
         .ok_or(EntryPointExecutionError::NativeExecutionError {
             info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
         })
@@ -252,7 +254,7 @@ pub fn decode_felts_as_str(encoding: &[Felt]) -> String {
             let err_msgs = encoding
                 .iter()
                 .map(|felt| match String::from_utf8(felt.to_bytes_be()[1..32].to_vec()) {
-                    Ok(s) => format!("{} ({})", s.trim_matches('\0'), felt.to_string()),
+                    Ok(s) => format!("{} ({})", s.trim_matches('\0'), felt),
                     Err(_) => felt.to_string(),
                 })
                 .join(", ");

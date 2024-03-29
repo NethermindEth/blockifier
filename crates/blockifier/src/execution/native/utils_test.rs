@@ -9,7 +9,7 @@ use starknet_api::hash::{StarkFelt, StarkHash};
 use starknet_api::{contract_address, patricia_key};
 use starknet_types_core::felt::Felt;
 
-use crate::execution::sierra_utils::{
+use super::{
     big4int_to_u256, contract_address_to_native_felt, contract_entrypoint_to_entrypoint_selector,
     decode_felts_as_str, encode_str_as_felts, native_felt_to_stark_felt, stark_felt_to_native_felt,
     u256_to_biguint,

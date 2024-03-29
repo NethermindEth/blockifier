@@ -22,13 +22,11 @@ use starknet_api::transaction::{
 };
 use starknet_types_core::felt::Felt;
 
-use super::execution_utils::max_fee_for_execution_info;
-use super::sierra_utils::{
+use super::utils::{
     allocate_point, big4int_to_u256, calculate_resource_bounds, contract_address_to_native_felt,
     default_tx_v2_info, encode_str_as_felts, native_felt_to_stark_felt, stark_felt_to_native_felt,
     u256_to_biguint,
 };
-use super::syscalls::exceeds_event_size_limit;
 use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, MessageToL1, OrderedEvent, OrderedL2ToL1Message};
 use crate::execution::common_hints::ExecutionMode;
@@ -37,6 +35,8 @@ use crate::execution::entry_point::{
     CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
 };
 use crate::execution::execution_utils::execute_deployment;
+use crate::execution::execution_utils::max_fee_for_execution_info;
+use crate::execution::syscalls::exceeds_event_size_limit;
 use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };

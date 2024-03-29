@@ -29,9 +29,8 @@ use crate::execution::entry_point::{
     EntryPointExecutionContext, EntryPointExecutionResult,
 };
 use crate::execution::errors::PostExecutionError;
-use crate::execution::{
-    deprecated_entry_point_execution, entry_point_execution, native_entry_point_execution,
-};
+use crate::execution::native::entry_point_execution as native_entry_point_execution;
+use crate::execution::{deprecated_entry_point_execution, entry_point_execution};
 use crate::state::errors::StateError;
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
@@ -321,7 +320,11 @@ pub fn format_panic_data(felts: &[StarkFelt]) -> String {
     while let Some(item) = format_next_item(&mut felts) {
         items.push(item.quote_if_string());
     }
-    if let [item] = &items[..] { item.clone() } else { format!("({})", items.join(", ")) }
+    if let [item] = &items[..] {
+        item.clone()
+    } else {
+        format!("({})", items.join(", "))
+    }
 }
 
 /// Returns the VM resources required for running `poseidon_hash_many` in the Starknet OS.

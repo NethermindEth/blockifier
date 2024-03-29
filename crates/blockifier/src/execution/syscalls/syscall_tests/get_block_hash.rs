@@ -11,7 +11,7 @@ use crate::abi::constants;
 use crate::context::ChainInfo;
 use crate::execution::call_info::{CallExecution, Retdata};
 use crate::execution::entry_point::CallEntryPoint;
-use crate::execution::sierra_utils::NATIVE_GAS_PLACEHOLDER;
+use crate::execution::native::utils::NATIVE_GAS_PLACEHOLDER;
 use crate::retdata;
 use crate::state::cached_state::CachedState;
 use crate::state::state_api::State;
@@ -77,11 +77,9 @@ fn negative_flow_execution_mode_validate(test_contract: FeatureContract) {
     let execution_result =
         entry_point_call.execute_directly_in_validate_mode(&mut state).unwrap_err();
 
-    assert!(
-        execution_result
-            .to_string()
-            .contains("Unauthorized syscall get_block_hash in execution mode Validate")
-    );
+    assert!(execution_result
+        .to_string()
+        .contains("Unauthorized syscall get_block_hash in execution mode Validate"));
 }
 
 #[test_case(FeatureContract::SierraTestContract; "Native")]

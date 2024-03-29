@@ -14,7 +14,7 @@ use crate::abi::abi_utils::selector_from_name;
 use crate::context::ChainInfo;
 use crate::execution::call_info::{CallExecution, CallInfo, Retdata};
 use crate::execution::entry_point::{CallEntryPoint, CallType};
-use crate::execution::sierra_utils::NATIVE_GAS_PLACEHOLDER;
+use crate::execution::native::utils::NATIVE_GAS_PLACEHOLDER;
 use crate::retdata;
 use crate::test_utils::contracts::FeatureContract;
 use crate::test_utils::initial_test_state::test_state;
@@ -97,7 +97,11 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     // Todo(rodrigo): Execution resources from the VM & Native are mesaured differently
     // helper function to change the expected resource values from both of executions
     let if_sierra = |a, b| {
-        if matches!(test_contract, FeatureContract::SierraTestContract) { a } else { b }
+        if matches!(test_contract, FeatureContract::SierraTestContract) {
+            a
+        } else {
+            b
+        }
     };
 
     // Create expected call info tree.

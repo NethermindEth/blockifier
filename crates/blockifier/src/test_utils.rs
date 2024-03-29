@@ -39,7 +39,7 @@ use crate::execution::entry_point::{
     CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
 };
 use crate::execution::execution_utils::{execute_deployment, felt_to_stark_felt}; /* TODO rename to felt252_to_stark_felt */
-use crate::execution::sierra_utils::{
+use crate::execution::native::utils::{
     contract_address_to_native_felt, native_felt_to_stark_felt, stark_felt_to_native_felt,
 };
 use crate::execution::syscalls::hint_processor::{

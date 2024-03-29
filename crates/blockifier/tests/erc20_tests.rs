@@ -1,6 +1,6 @@
 // run with:
 // cargo test --test erc20_tests --features testing
-use blockifier::execution::sierra_utils::{
+use blockifier::execution::native::utils::{
     contract_address_to_native_felt, native_felt_to_stark_felt, stark_felt_to_native_felt,
 };
 use blockifier::test_utils::*;

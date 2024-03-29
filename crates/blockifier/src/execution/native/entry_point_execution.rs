@@ -4,17 +4,19 @@ use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use starknet_api::core::ClassHash;
 
-use super::entry_point::EntryPointExecutionResult;
-use super::errors::EntryPointExecutionError;
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::SierraContractClassV1;
-use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionContext};
-use crate::execution::native_syscall_handler::NativeSyscallHandler;
-use crate::execution::sierra_utils::{
+use crate::execution::entry_point::{
+    CallEntryPoint, EntryPointExecutionContext, EntryPointExecutionResult,
+};
+use crate::execution::errors::EntryPointExecutionError;
+use crate::state::state_api::State;
+
+use super::syscall_handler::NativeSyscallHandler;
+use super::utils::{
     create_callinfo, get_native_aot_program_cache, get_native_executor,
     get_sierra_entry_function_id, match_entrypoint, run_native_executor,
 };
-use crate::state::state_api::State;
 
 pub fn execute_entry_point_call(
     call: CallEntryPoint,
