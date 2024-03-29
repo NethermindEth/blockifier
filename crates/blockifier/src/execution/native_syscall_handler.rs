@@ -24,7 +24,7 @@ use starknet_types_core::felt::Felt;
 
 use super::execution_utils::max_fee_for_execution_info;
 use super::sierra_utils::{
-    allocate_point, big4int_to_u256, calculate_resource_bounds, contract_address_to_felt,
+    allocate_point, big4int_to_u256, calculate_resource_bounds, contract_address_to_native_felt,
     default_tx_v2_info, encode_str_as_felts, native_felt_to_stark_felt, stark_felt_to_native_felt,
     u256_to_biguint,
 };
@@ -141,7 +141,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             BlockInfo {
                 block_number: block_info.block_number.0,
                 block_timestamp: block_info.block_timestamp.0,
-                sequencer_address: contract_address_to_felt(block_info.sequencer_address),
+                sequencer_address: contract_address_to_native_felt(block_info.sequencer_address),
             }
         };
 
@@ -149,7 +149,7 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         let tx_info = &self.execution_context.tx_context.tx_info;
         let mut native_tx_info = TxV2Info {
             version: stark_felt_to_native_felt(tx_info.signed_version().0),
-            account_contract_address: contract_address_to_felt(tx_info.sender_address()),
+            account_contract_address: contract_address_to_native_felt(tx_info.sender_address()),
             max_fee: max_fee_for_execution_info(tx_info).to_u128().unwrap(),
             signature: tx_info.signature().0.into_iter().map(stark_felt_to_native_felt).collect(),
             transaction_hash: stark_felt_to_native_felt(tx_info.transaction_hash().0),
@@ -187,8 +187,8 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
             };
         }
 
-        let caller_address = contract_address_to_felt(self.caller_address);
-        let contract_address = contract_address_to_felt(self.contract_address);
+        let caller_address = contract_address_to_native_felt(self.caller_address);
+        let contract_address = contract_address_to_native_felt(self.contract_address);
         let entry_point_selector = stark_felt_to_native_felt(self.entry_point_selector);
 
         Ok(ExecutionInfoV2 {
