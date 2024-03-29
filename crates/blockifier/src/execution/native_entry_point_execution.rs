@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
 use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
@@ -14,7 +12,7 @@ use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionContext};
 use crate::execution::native_syscall_handler::NativeSyscallHandler;
 use crate::execution::sierra_utils::{
     create_callinfo, get_native_aot_program_cache, get_native_executor,
-    get_sierra_entry_function_id, match_entrypoint, run_native_executor, setup_syscall_handler,
+    get_sierra_entry_function_id, match_entrypoint, run_native_executor,
 };
 use crate::state::state_api::State;
 
@@ -40,21 +38,13 @@ pub fn execute_entry_point_call(
 
     let native_executor = get_native_executor(code_class_hash, sierra_program, program_cache);
 
-    let mut syscall_handler: NativeSyscallHandler<'_> = setup_syscall_handler(
+    let mut syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
         state,
         call.caller_address,
         call.storage_address,
         call.entry_point_selector,
-        resources, /* TODO, no longer supports clone, do we add it or can we get away with using
-                    * mut refs */
+        resources,
         context,
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Default::default(),
-        Default::default(),
-        Vec::new(),
-        HashSet::new(),
     );
 
     let syscall_handler_meta = SyscallHandlerMeta::new(&mut syscall_handler);

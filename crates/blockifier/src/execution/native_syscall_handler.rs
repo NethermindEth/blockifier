@@ -48,20 +48,54 @@ use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
 
 pub struct NativeSyscallHandler<'state> {
+    // Input for execution
     pub state: &'state mut dyn State,
+    pub execution_resources: &'state mut ExecutionResources,
+    pub execution_context: &'state mut EntryPointExecutionContext,
+
+    // Call information
     pub caller_address: ContractAddress,
     pub contract_address: ContractAddress,
     pub entry_point_selector: StarkFelt,
-    pub execution_resources: &'state mut ExecutionResources,
-    pub execution_context: &'state mut EntryPointExecutionContext,
+
+    // Execution results
     pub events: Vec<OrderedEvent>,
     pub l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
     pub inner_calls: Vec<CallInfo>,
+    // Additional execution result info
+    pub storage_read_values: Vec<StarkFelt>,
+    pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
+
     // Secp hint processors.
     pub secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
     pub secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
-    pub storage_read_values: Vec<StarkFelt>,
-    pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
+}
+
+impl<'state> NativeSyscallHandler<'_> {
+    pub fn new(
+        state: &'state mut dyn State,
+        caller_address: ContractAddress,
+        contract_address: ContractAddress,
+        entry_point_selector: EntryPointSelector,
+        execution_resources: &'state mut ExecutionResources,
+        execution_context: &'state mut EntryPointExecutionContext,
+    ) -> NativeSyscallHandler<'state> {
+        NativeSyscallHandler {
+            state,
+            caller_address,
+            contract_address,
+            entry_point_selector: entry_point_selector.0,
+            execution_resources,
+            execution_context,
+            events: Vec::new(),
+            l2_to_l1_messages: Vec::new(),
+            inner_calls: Vec::new(),
+            secp256k1_hint_processor: Default::default(),
+            secp256r1_hint_processor: Default::default(),
+            storage_read_values: Vec::new(),
+            accessed_storage_keys: HashSet::new(),
+        }
+    }
 }
 
 impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {

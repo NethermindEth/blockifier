@@ -29,11 +29,8 @@ use starknet_types_core::felt::Felt;
 use super::call_info::{CallExecution, CallInfo, OrderedEvent, OrderedL2ToL1Message, Retdata};
 use super::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use super::errors::EntryPointExecutionError;
-use super::native_syscall_handler::NativeSyscallHandler;
-use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
 use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
-use crate::state::state_api::State;
 use crate::transaction::objects::CurrentTransactionInfo;
 
 #[cfg(test)]
@@ -124,39 +121,6 @@ pub fn get_sierra_entry_function_id<'a>(
         .find(|func| func.id.id == u64::try_from(matching_entrypoint.function_idx).unwrap())
         .unwrap()
         .id
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn setup_syscall_handler<'state>(
-    state: &'state mut dyn State,
-    caller_address: ContractAddress,
-    contract_address: ContractAddress,
-    entry_point_selector: EntryPointSelector,
-    execution_resources: &'state mut ExecutionResources,
-    execution_context: &'state mut EntryPointExecutionContext,
-    events: Vec<OrderedEvent>,
-    l2_to_l1_messages: Vec<OrderedL2ToL1Message>,
-    inner_calls: Vec<CallInfo>,
-    secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
-    secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
-    storage_read_values: Vec<StarkFelt>,
-    accessed_storage_keys: HashSet<StorageKey, RandomState>,
-) -> NativeSyscallHandler<'state> {
-    NativeSyscallHandler {
-        state,
-        caller_address,
-        contract_address,
-        entry_point_selector: entry_point_selector.0,
-        execution_context,
-        events,
-        l2_to_l1_messages,
-        execution_resources,
-        inner_calls,
-        secp256k1_hint_processor,
-        secp256r1_hint_processor,
-        storage_read_values,
-        accessed_storage_keys,
-    }
 }
 
 pub fn stark_felt_to_native_felt(stark_felt: StarkFelt) -> Felt {
