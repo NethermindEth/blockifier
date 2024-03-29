@@ -254,8 +254,8 @@ pub fn u256_to_biguint(u256: U256) -> BigUint {
 pub fn big4int_to_u256(b_int: BigInt<4>) -> U256 {
     let [a, b, c, d] = b_int.0;
 
-    let hi = u128::from(a) | (u128::from(b) << 64);
-    let lo = u128::from(c) | (u128::from(d) << 64);
+    let lo = u128::from(a) | (u128::from(b) << 64);
+    let hi = u128::from(c) | (u128::from(d) << 64);
 
     U256 { lo, hi }
 }

@@ -1,3 +1,4 @@
+use ark_ff::BigInt;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoint;
 use cairo_native::starknet::U256;
 use num_bigint::BigUint;
@@ -12,7 +13,7 @@ use starknet_api::{
 use starknet_types_core::felt::Felt;
 
 use crate::execution::sierra_utils::{
-    contract_address_to_native_felt, contract_entrypoint_to_entrypoint_selector,
+    big4int_to_u256, contract_address_to_native_felt, contract_entrypoint_to_entrypoint_selector,
     decode_felts_as_str, encode_str_as_felts, native_felt_to_stark_felt, stark_felt_to_native_felt,
     u256_to_biguint,
 };
@@ -27,6 +28,21 @@ fn test_u256_to_biguint() {
     let actual_biguint = u256_to_biguint(u256);
 
     assert_eq!(actual_biguint, expected_biguint);
+}
+
+#[test]
+fn big4int_to_u256_test() {
+    let big_int: BigInt<4> =
+        BigInt!("34627219085299802438030559924718133626325687994345768323532899246965609283226");
+
+    let expected_u256 = U256 {
+        lo: 162661716537849136813498421163242372762,
+        hi: 101760251048639038778899488808831626319,
+    };
+
+    let actual_u256 = big4int_to_u256(big_int);
+
+    assert_eq!(actual_u256, expected_u256);
 }
 
 #[test]
@@ -61,7 +77,7 @@ fn test_felt_to_stark_felt() {
     let expected_stark_felt = StarkFelt::from_u128(NUM);
     let actual_stark_felt = native_felt_to_stark_felt(felt);
 
-    assert_eq!(expected_stark_felt, actual_stark_felt);
+    assert_eq!(actual_stark_felt, expected_stark_felt);
 }
 
 #[test]
@@ -72,7 +88,7 @@ fn test_stark_felt_to_felt() {
     let expected_felt = Felt::from(NUM);
     let actual_felt = stark_felt_to_native_felt(stark_felt);
 
-    assert_eq!(expected_felt, actual_felt);
+    assert_eq!(actual_felt, expected_felt);
 }
 
 #[test]
@@ -83,7 +99,7 @@ fn test_contract_address_to_felt() {
     let expected_felt = Felt::from(NUM);
     let actual_felt = contract_address_to_native_felt(contract_address);
 
-    assert_eq!(expected_felt, actual_felt);
+    assert_eq!(actual_felt, expected_felt);
 }
 
 #[test]
@@ -94,5 +110,5 @@ fn test_contract_entrypoint_to_entrypoint_selector() {
     let expected_entrypoint_selector = EntryPointSelector(StarkFelt::from_u128(NUM));
     let actual_entrypoint_selector = contract_entrypoint_to_entrypoint_selector(&entrypoint);
 
-    assert_eq!(expected_entrypoint_selector, actual_entrypoint_selector);
+    assert_eq!(actual_entrypoint_selector, expected_entrypoint_selector);
 }
