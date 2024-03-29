@@ -4,12 +4,9 @@ use cairo_native::starknet::U256;
 use num_bigint::BigUint;
 use num_traits::Num;
 use pretty_assertions::assert_eq;
-use starknet_api::{
-    contract_address,
-    core::{ContractAddress, EntryPointSelector, PatriciaKey},
-    hash::{StarkFelt, StarkHash},
-    patricia_key,
-};
+use starknet_api::core::{ContractAddress, EntryPointSelector, PatriciaKey};
+use starknet_api::hash::{StarkFelt, StarkHash};
+use starknet_api::{contract_address, patricia_key};
 use starknet_types_core::felt::Felt;
 
 use crate::execution::sierra_utils::{
