@@ -34,8 +34,7 @@ use crate::execution::contract_class::ContractClass;
 use crate::execution::entry_point::{
     CallEntryPoint, CallType, ConstructorContext, EntryPointExecutionContext,
 };
-use crate::execution::execution_utils::execute_deployment;
-use crate::execution::execution_utils::max_fee_for_execution_info;
+use crate::execution::execution_utils::{execute_deployment, max_fee_for_execution_info};
 use crate::execution::syscalls::exceeds_event_size_limit;
 use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
