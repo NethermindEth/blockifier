@@ -1026,7 +1026,7 @@ dependencies = [
 [[package]]
 name = "cairo-native"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/cairo_native?branch=Dom/versions#7a910873aef3d2746843f118a89328d89b8b071c"
+source = "git+https://github.com/NethermindEth/cairo_native?branch=rodro/trampoline-fix#e421d5c876f5027123a6be7a3b59aeb25aedfee2"
 dependencies = [
  "anyhow",
  "bumpalo",
@@ -1071,7 +1071,7 @@ dependencies = [
 [[package]]
 name = "cairo-native-runtime"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/cairo_native?branch=Dom/versions#7a910873aef3d2746843f118a89328d89b8b071c"
+source = "git+https://github.com/NethermindEth/cairo_native?branch=rodro/trampoline-fix#e421d5c876f5027123a6be7a3b59aeb25aedfee2"
 dependencies = [
  "cairo-lang-runner",
  "lazy_static",
