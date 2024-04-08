@@ -23,8 +23,7 @@ macro_rules! retdata {
     };
 }
 
-#[cfg_attr(test, derive(Clone))]
-#[derive(Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct OrderedEvent {
     pub order: usize,
     pub event: EventContent,
@@ -182,7 +181,9 @@ impl<'a> Iterator for CallInfoIter<'a> {
     type Item = &'a CallInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let call_info = self.call_infos.pop()?;
+        let Some(call_info) = self.call_infos.pop() else {
+            return None;
+        };
 
         // Push order is right to left.
         self.call_infos.extend(call_info.inner_calls.iter().rev());

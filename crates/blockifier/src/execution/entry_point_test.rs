@@ -577,6 +577,7 @@ fn get_entry_point_offset(
                 .unwrap()
                 .offset
         }
+        ContractClass::V1Sierra(_) => panic!("Expected V0 or V1, got V1Sierra."),
     }
 }
 

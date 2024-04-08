@@ -1,3 +1,4 @@
+use cairo_native::error::jit_engine::RunnerError as NativeRunnerError;
 use cairo_vm::types::errors::math_errors::MathError;
 use cairo_vm::vm::errors::cairo_run_errors::CairoRunError;
 use cairo_vm::vm::errors::memory_errors::MemoryError;
@@ -139,6 +140,17 @@ pub enum EntryPointExecutionError {
         #[source]
         source: CairoRunError,
     },
+    #[error("Native execution error: {info}")]
+    NativeExecutionError { info: String },
+    #[error("Native unexpected error: {source}")]
+    NativeUnexpectedError {
+        #[source]
+        source: NativeRunnerError,
+    },
+    #[error("Native Fallback Error: {info}")]
+    NativeFallbackError { info: Box<EntryPointExecutionError> },
+    #[error("Failed to convert Sierra to Casm: {0}")]
+    FailedToConvertSierraToCasm(String),
 }
 
 #[derive(Debug, Error)]
