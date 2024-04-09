@@ -12,7 +12,6 @@ use cairo_native::cache::{AotProgramCache, JitProgramCache, ProgramCache};
 use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
-use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
 use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
 use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
@@ -31,6 +30,7 @@ use crate::execution::call_info::{
 };
 use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use crate::execution::errors::EntryPointExecutionError;
+use crate::execution::native::syscall_handler::NativeSyscallHandler;
 use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
 use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
 use crate::transaction::objects::CurrentTransactionInfo;
@@ -147,9 +147,9 @@ pub fn contract_entrypoint_to_entrypoint_selector(
 pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
-    call: &CallEntryPoint,
-    syscall_handler: &SyscallHandlerMeta,
-) -> EntryPointExecutionResult<ContractExecutionResult> {
+    call: CallEntryPoint,
+    mut syscall_handler: NativeSyscallHandler<'_>,
+) -> EntryPointExecutionResult<CallInfo> {
     let stark_felts_to_native_felts = |data: &[StarkFelt]| -> Vec<Felt> {
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
     };
@@ -159,17 +159,17 @@ pub fn run_native_executor(
             sierra_entry_function_id,
             &stark_felts_to_native_felts(&call.calldata.0),
             Some(call.initial_gas.into()),
-            Some(syscall_handler),
+            &mut syscall_handler,
         ),
         NativeExecutor::Jit(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
             &stark_felts_to_native_felts(&call.calldata.0),
             Some(call.initial_gas.into()),
-            Some(syscall_handler),
+            &mut syscall_handler,
         ),
     };
 
-    match execution_result {
+    let run_result = match execution_result {
         Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeExecutionError {
             info: if !res.return_values.is_empty() {
                 decode_felts_as_str(&res.return_values)
@@ -181,7 +181,17 @@ pub fn run_native_executor(
             Err(EntryPointExecutionError::NativeUnexpectedError { source: runner_err })
         }
         Ok(res) => Ok(res),
-    }
+    }?;
+
+    create_callinfo(
+        call.clone(),
+        run_result,
+        syscall_handler.events,
+        syscall_handler.l2_to_l1_messages,
+        syscall_handler.inner_calls,
+        syscall_handler.storage_read_values,
+        syscall_handler.accessed_storage_keys,
+    )
 }
 
 pub fn create_callinfo(

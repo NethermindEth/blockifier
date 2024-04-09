@@ -1,13 +1,12 @@
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
-use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use starknet_api::core::ClassHash;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::{
-    create_callinfo, get_native_aot_program_cache, get_native_executor,
-    get_sierra_entry_function_id, match_entrypoint, run_native_executor,
+    get_native_aot_program_cache, get_native_executor, get_sierra_entry_function_id,
+    match_entrypoint, run_native_executor,
 };
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::SierraContractClassV1;
@@ -39,7 +38,7 @@ pub fn execute_entry_point_call(
 
     let native_executor = get_native_executor(code_class_hash, sierra_program, program_cache);
 
-    let mut syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
+    let syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
         state,
         call.caller_address,
         call.storage_address,
@@ -48,25 +47,8 @@ pub fn execute_entry_point_call(
         context,
     );
 
-    let syscall_handler_meta = SyscallHandlerMeta::new(&mut syscall_handler);
-
     let sierra_entry_function_id =
         get_sierra_entry_function_id(matching_entrypoint, sierra_program);
 
-    let run_result = run_native_executor(
-        native_executor,
-        sierra_entry_function_id,
-        &call,
-        &syscall_handler_meta,
-    )?;
-
-    create_callinfo(
-        call,
-        run_result,
-        syscall_handler.events,
-        syscall_handler.l2_to_l1_messages,
-        syscall_handler.inner_calls,
-        syscall_handler.storage_read_values,
-        syscall_handler.accessed_storage_keys,
-    )
+    run_native_executor(native_executor, sierra_entry_function_id, call, syscall_handler)
 }

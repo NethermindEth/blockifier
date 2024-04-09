@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use cairo_felt::Felt252;
 use cairo_native::starknet::{
-    BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarkNetSyscallHandler,
+    BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
     SyscallResult, TxV2Info, U256,
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
@@ -45,7 +45,6 @@ use crate::execution::syscalls::secp::{
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
-
 pub struct NativeSyscallHandler<'state> {
     // Input for execution
     pub state: &'state mut dyn State,
@@ -97,7 +96,7 @@ impl<'state> NativeSyscallHandler<'_> {
     }
 }
 
-impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
+impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     fn get_block_hash(
         &mut self,
         block_number: u64,
