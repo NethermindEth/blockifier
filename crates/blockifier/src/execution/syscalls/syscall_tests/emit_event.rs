@@ -23,7 +23,7 @@ const DATA: [StarkFelt; 3] =
 const N_EMITTED_EVENTS: [StarkFelt; 1] = [StarkFelt::from_u128(1)];
 
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 82930; "VM")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 49860; "VM")]
 fn positive_flow(test_contract: FeatureContract, expected_gas: u64) {
     // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion
     // works.

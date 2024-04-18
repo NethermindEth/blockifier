@@ -98,7 +98,7 @@ fn no_constructor_nonempty_calldata(feature_contract: FeatureContract) {
 )]
 #[test_case(
     FeatureContract::TestContract(CairoVersion::Cairo1),
-    16640;
+    10140;
     "VM"
 )]
 fn with_constructor(feature_contract: FeatureContract, gas: u64) {

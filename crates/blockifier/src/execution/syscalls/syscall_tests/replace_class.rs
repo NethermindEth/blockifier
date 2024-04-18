@@ -50,7 +50,7 @@ fn cairo0_class_hash(test_contract: FeatureContract) {
 }
 
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")] // pass
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 14450; "VM")] // pass
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 9750; "VM")] // pass
 fn positive_flow(test_contract: FeatureContract, gas_consumed: u64) {
     let mut state = create_deploy_test_state(test_contract);
     let contract_address = contract_address!(TEST_CONTRACT_ADDRESS);

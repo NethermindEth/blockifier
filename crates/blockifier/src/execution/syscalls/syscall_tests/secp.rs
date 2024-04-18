@@ -12,7 +12,7 @@ use crate::test_utils::{trivial_external_entry_point_new, CairoVersion, BALANCE}
 
 // TODO: Native
 // #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 17210900; "VM")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 17035610; "VM")]
 fn test_secp256k1(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
@@ -31,7 +31,7 @@ fn test_secp256k1(test_contract: FeatureContract, expected_gas: u64) {
 }
 
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 27650390; "VM")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 27582560; "VM")]
 fn test_secp256r1(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);

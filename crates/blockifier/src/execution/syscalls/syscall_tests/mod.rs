@@ -32,8 +32,8 @@ use crate::test_utils::contracts::FeatureContract;
 use crate::test_utils::initial_test_state::test_state;
 use crate::test_utils::{trivial_external_entry_point_new, CairoVersion, BALANCE};
 
-pub const REQUIRED_GAS_STORAGE_READ_WRITE_TEST: u64 = 34650;
-pub const REQUIRED_GAS_CALL_CONTRACT_TEST: u64 = 128080;
+pub const REQUIRED_GAS_STORAGE_READ_WRITE_TEST: u64 = 27150;
+pub const REQUIRED_GAS_CALL_CONTRACT_TEST: u64 = 105680;
 pub const REQUIRED_GAS_LIBRARY_CALL_TEST: u64 = REQUIRED_GAS_CALL_CONTRACT_TEST;
 
 fn assert_contract_uses_native(class_hash: ClassHash, state: &dyn State) {

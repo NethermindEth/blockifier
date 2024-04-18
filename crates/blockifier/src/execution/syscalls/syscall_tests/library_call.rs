@@ -77,7 +77,7 @@ fn test_library_call_assert_fails(test_contract: FeatureContract) {
 }
 
 #[test_case(FeatureContract::SierraTestContract, NATIVE_GAS_PLACEHOLDER; "Native")]
-#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 316180; "VM")]
+#[test_case(FeatureContract::TestContract(CairoVersion::Cairo1), 276880; "VM")]
 fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
@@ -114,7 +114,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999831220, 9999720720),
+        initial_gas: if_sierra(9999847020, 9999745020),
         ..trivial_external_entry_point_new(test_contract)
     };
     let library_entry_point = CallEntryPoint {
@@ -129,12 +129,12 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999866550, 9999814150),
+        initial_gas: if_sierra(9999874550, 9999823550),
         ..trivial_external_entry_point_new(test_contract)
     };
     let storage_entry_point = CallEntryPoint {
         calldata: calldata![stark_felt!(key), stark_felt!(value)],
-        initial_gas: if_sierra(9999866550, 9999625070),
+        initial_gas: if_sierra(9999874550, 9999656870),
         ..nested_storage_entry_point
     };
 
@@ -149,8 +149,8 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     };
 
     let storage_entry_point_resources = default_resources_if_sierra(ExecutionResources {
-        n_steps: 319,
-        n_memory_holes: 1,
+        n_steps: 243,
+        n_memory_holes: 0,
         builtin_instance_counter: HashMap::from([(RANGE_CHECK_BUILTIN_NAME.to_string(), 7)]),
     });
     let nested_storage_call_info = CallInfo {
@@ -167,8 +167,8 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     };
 
     let library_call_resources = default_resources_if_sierra(ExecutionResources {
-        n_steps: 1338,
-        n_memory_holes: 2,
+        n_steps: 1139,
+        n_memory_holes: 0,
         builtin_instance_counter: HashMap::from([(RANGE_CHECK_BUILTIN_NAME.to_string(), 35)]),
     });
     let library_call_info = CallInfo {
@@ -197,8 +197,8 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     };
 
     let main_call_resources = default_resources_if_sierra(ExecutionResources {
-        n_steps: 3370,
-        n_memory_holes: 4,
+        n_steps: 3002,
+        n_memory_holes: 2,
         builtin_instance_counter: HashMap::from([(RANGE_CHECK_BUILTIN_NAME.to_string(), 87)]),
     });
     let expected_call_info = CallInfo {

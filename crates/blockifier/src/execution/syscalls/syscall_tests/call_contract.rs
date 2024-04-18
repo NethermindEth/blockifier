@@ -28,7 +28,7 @@ use crate::test_utils::{create_calldata, trivial_external_entry_point_new, Cairo
 #[test_case(
     FeatureContract::TestContract(CairoVersion::Cairo1),
     FeatureContract::SierraTestContract,
-    93430 + NATIVE_GAS_PLACEHOLDER;
+    78530 + NATIVE_GAS_PLACEHOLDER;
     "Call Contract with caller using VM and callee using Native")
 ]
 #[test_case(

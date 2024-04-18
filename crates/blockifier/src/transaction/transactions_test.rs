@@ -1718,12 +1718,12 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
         },
         execution: CallExecution {
             retdata: Retdata(vec![value]),
-            gas_consumed: 19650,
+            gas_consumed: 11750,
             ..Default::default()
         },
         resources: ExecutionResources {
-            n_steps: 232,
-            n_memory_holes: 1,
+            n_steps: 154,
+            n_memory_holes: 0,
             builtin_instance_counter: HashMap::from([(RANGE_CHECK_BUILTIN_NAME.to_string(), 6)]),
         },
         accessed_storage_keys: HashSet::from_iter(vec![accessed_storage_key]),
@@ -1748,7 +1748,7 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
 
     let mut expected_resource_mapping = ResourcesMapping(HashMap::from([
         (HASH_BUILTIN_NAME.to_string(), 11 + payload_size),
-        (abi_constants::N_STEPS_RESOURCE.to_string(), 1405),
+        (abi_constants::N_STEPS_RESOURCE.to_string(), 1326),
         (RANGE_CHECK_BUILTIN_NAME.to_string(), 23),
         (abi_constants::L1_GAS_USAGE.to_string(), usize_from_u128(expected_gas.l1_gas).unwrap()),
         (
@@ -1794,7 +1794,8 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
     let error = tx_no_fee.execute(state, block_context, true, true).unwrap_err();
     // Today, we check that the paid_fee is positive, no matter what was the actual fee.
     let expected_actual_fee =
-        if use_kzg_da { Fee(1744900000000000) } else { Fee(1742800000000000) };
+        if use_kzg_da { Fee(1737000000000000) } else { Fee(1734900000000000) };
+
     assert_matches!(
         error,
         TransactionExecutionError::TransactionFeeError(

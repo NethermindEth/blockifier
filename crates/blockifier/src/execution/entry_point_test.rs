@@ -29,7 +29,7 @@ use crate::test_utils::{
 };
 use crate::versioned_constants::VersionedConstants;
 
-const INNER_CALL_CONTRACT_IN_CALL_CHAIN_OFFSET: usize = 65;
+const INNER_CALL_CONTRACT_IN_CALL_CHAIN_OFFSET: usize = 117;
 
 #[test]
 fn test_call_info_iteration() {
@@ -646,20 +646,13 @@ Unknown location (pc=0:1188)
         *test_contract_address_3.0.key(),
     );
 
-    let pc_location = entry_point_offset.0 + 82;
     let expected_trace_cairo1 = format!(
         "Error in the called contract ({}):
-Error at pc=0:4992:
+Error at pc=0:612:
 Got an exception while executing a hint.
-Cairo traceback (most recent call last):
-Unknown location (pc=0:{pc_location})
-
 Error in the called contract ({}):
-Error at pc=0:4992:
+Error at pc=0:612:
 Got an exception while executing a hint: Execution failed. Failure reason: 0x6661696c ('fail').
-Cairo traceback (most recent call last):
-Unknown location (pc=0:{pc_location})
-
 Error in the called contract ({}):
 Execution failed. Failure reason: 0x6661696c ('fail').
 ",
@@ -684,7 +677,7 @@ Execution failed. Failure reason: 0x6661696c ('fail').
 #[rstest]
 #[case(CairoVersion::Cairo0, "invoke_call_chain", "Couldn't compute operand op0. Unknown value for memory cell 1:37", (1081_u16, 1127_u16))]
 #[case(CairoVersion::Cairo0, "fail", "An ASSERT_EQ instruction failed: 1 != 0.", (1184_u16, 1135_u16))]
-#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x75382069732030 ('u8 is 0')", (0_u16, 0_u16))]
+#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x4469766973696f6e2062792030 ('Division by 0')", (0_u16, 0_u16))]
 #[case(CairoVersion::Cairo1, "fail", "0x6661696c ('fail')", (0_u16, 0_u16))]
 fn test_trace_callchain_ends_with_regular_call(
     #[case] cairo_version: CairoVersion,
@@ -747,7 +740,7 @@ Unknown location (pc=0:{})
             let pc_location = entry_point_offset.0 + INNER_CALL_CONTRACT_IN_CALL_CHAIN_OFFSET;
             format!(
                 "Error in the called contract ({contract_address_felt}):
-Error at pc=0:8010:
+Error at pc=0:9228:
 Got an exception while executing a hint: Execution failed. Failure reason: {expected_error}.
 Cairo traceback (most recent call last):
 Unknown location (pc=0:{pc_location})
@@ -768,10 +761,10 @@ Execution failed. Failure reason: {expected_error}.
 #[case(CairoVersion::Cairo0, "invoke_call_chain", "Couldn't compute operand op0. Unknown value for memory cell 1:23", 1_u8, 1_u8, (49_u16, 1111_u16, 1081_u16, 1166_u16))]
 #[case(CairoVersion::Cairo0, "fail", "An ASSERT_EQ instruction failed: 1 != 0.", 0_u8, 0_u8, (37_u16, 1093_u16, 1184_u16, 1188_u16))]
 #[case(CairoVersion::Cairo0, "fail", "An ASSERT_EQ instruction failed: 1 != 0.", 0_u8, 1_u8, (49_u16, 1111_u16, 1184_u16, 1188_u16))]
-#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x75382069732030 ('u8 is 0')", 1_u8, 0_u8, (8010_u16, 0_u16, 0_u16, 0_u16))]
-#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x75382069732030 ('u8 is 0')", 1_u8, 1_u8, (8099_u16, 0_u16, 0_u16, 0_u16))]
-#[case(CairoVersion::Cairo1, "fail", "0x6661696c ('fail')", 0_u8, 0_u8, (8010_u16, 0_u16, 0_u16, 0_u16))]
-#[case(CairoVersion::Cairo1, "fail", "0x6661696c ('fail')", 0_u8, 1_u8, (8099_u16, 0_u16, 0_u16, 0_u16))]
+#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x4469766973696f6e2062792030 ('Division by 0')", 1_u8, 0_u8, (9228_u16, 0_u16, 0_u16, 0_u16))]
+#[case(CairoVersion::Cairo1, "invoke_call_chain", "0x4469766973696f6e2062792030 ('Division by 0')", 1_u8, 1_u8, (9297_u16, 0_u16, 0_u16, 0_u16))]
+#[case(CairoVersion::Cairo1, "fail", "0x6661696c ('fail')", 0_u8, 0_u8, (9228_u16, 0_u16, 0_u16, 0_u16))]
+#[case(CairoVersion::Cairo1, "fail", "0x6661696c ('fail')", 0_u8, 1_u8, (9297_u16, 0_u16, 0_u16, 0_u16))]
 fn test_trace_call_chain_with_syscalls(
     #[case] cairo_version: CairoVersion,
     #[case] last_func_name: &str,
@@ -849,7 +842,7 @@ Unknown location (pc=0:{})
             let pc_location = entry_point_offset.0 + INNER_CALL_CONTRACT_IN_CALL_CHAIN_OFFSET;
             format!(
                 "Error in the called contract ({address_felt}):
-Error at pc=0:8010:
+Error at pc=0:9228:
 Got an exception while executing a hint.
 Cairo traceback (most recent call last):
 Unknown location (pc=0:{pc_location})
