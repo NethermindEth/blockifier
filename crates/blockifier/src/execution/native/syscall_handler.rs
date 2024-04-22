@@ -10,10 +10,16 @@ use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
 use starknet_types_core::felt::Felt;
 
+use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, OrderedEvent, OrderedL2ToL1Message};
 use crate::execution::entry_point::EntryPointExecutionContext;
+use crate::execution::syscalls::hint_processor::{SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR};
 use crate::execution::syscalls::secp::SecpHintProcessor;
 use crate::state::state_api::State;
+
+use crate::execution::common_hints::ExecutionMode;
+
+use super::utils::encode_str_as_felts;
 
 pub struct NativeSyscallHandler<'state> {
     // Input for execution
@@ -69,10 +75,41 @@ impl<'state> NativeSyscallHandler<'_> {
 impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
     fn get_block_hash(
         &mut self,
-        _block_number: u64,
+        block_number: u64,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
-        unimplemented!("implement get_block_hash")
+        if self.execution_context.execution_mode == ExecutionMode::Validate {
+            let err = SyscallExecutionError::InvalidSyscallInExecutionMode {
+                syscall_name: "get_block_hash".to_string(),
+                execution_mode: ExecutionMode::Validate,
+            };
+
+            return Err(encode_str_as_felts(&err.to_string()));
+        }
+
+        let current_block_number =
+            self.execution_context.tx_context.block_context.block_info.block_number.0;
+
+        if current_block_number < constants::STORED_BLOCK_HASH_BUFFER
+            || block_number > current_block_number - constants::STORED_BLOCK_HASH_BUFFER
+        {
+            // `panic` is unreachable in this case, also this is covered by tests so we can safely
+            // unwrap
+            let out_of_range_felt = Felt::from_hex(BLOCK_NUMBER_OUT_OF_RANGE_ERROR).unwrap();
+
+            return Err(vec![out_of_range_felt]);
+        }
+
+        let key = StorageKey::try_from(StarkFelt::from(block_number))
+            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
+        let block_hash_address =
+            ContractAddress::try_from(StarkFelt::from(constants::BLOCK_HASH_CONTRACT_ADDRESS))
+                .map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+        match self.state.get_storage_at(block_hash_address, key) {
+            Ok(value) => Ok(Felt::from_bytes_be_slice(value.bytes())),
+            Err(e) => Err(encode_str_as_felts(&e.to_string())),
+        }
     }
 
     fn get_execution_info(
