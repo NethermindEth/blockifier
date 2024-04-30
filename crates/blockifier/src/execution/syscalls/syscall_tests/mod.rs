@@ -36,6 +36,15 @@ pub const REQUIRED_GAS_STORAGE_READ_WRITE_TEST: u64 = 34650;
 pub const REQUIRED_GAS_CALL_CONTRACT_TEST: u64 = 128080;
 pub const REQUIRED_GAS_LIBRARY_CALL_TEST: u64 = REQUIRED_GAS_CALL_CONTRACT_TEST;
 
+fn assert_contract_uses_native(class_hash: ClassHash, state: &dyn State) {
+    assert_matches!(
+        state
+            .get_compiled_contract_class(class_hash)
+            .unwrap_or_else(|_| panic!("Expected contract class at {class_hash}")),
+        ContractClass::V1Sierra(_)
+    )
+}
+
 fn assert_contract_uses_vm(class_hash: ClassHash, state: &dyn State) {
     assert_matches!(
         state
@@ -51,8 +60,10 @@ fn assert_consistent_contract_version(contract: FeatureContract, state: &dyn Sta
         FeatureContract::SecurityTests | FeatureContract::ERC20 => {
             assert_contract_uses_vm(hash, state)
         }
-        FeatureContract::LegacyTestContract
-        | FeatureContract::AccountWithLongValidate(_)
+        FeatureContract::LegacyTestContract | FeatureContract::SierraTestContract => {
+            assert_contract_uses_native(hash, state)
+        }
+        FeatureContract::AccountWithLongValidate(_)
         | FeatureContract::AccountWithoutValidations(_)
         | FeatureContract::Empty(_)
         | FeatureContract::FaultyAccount(_)
@@ -73,6 +84,9 @@ fn verify_compiler_version(contract: FeatureContract, expected_version: &str) {
     }
 }
 
+// TODO: Native
+// #[test_case(FeatureContract::SierraTestContract; "Native")] // fail bc it doesn't limit on gas,
+// not expecting it to yet
 #[test_case(FeatureContract::TestContract(CairoVersion::Cairo1); "VM")] // pass
 fn test_out_of_gas(test_contract: FeatureContract) {
     let chain_info = &ChainInfo::create_for_testing();

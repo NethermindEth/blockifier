@@ -10,16 +10,16 @@ use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
 use starknet_types_core::felt::Felt;
 
+use super::utils::encode_str_as_felts;
 use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, OrderedEvent, OrderedL2ToL1Message};
+use crate::execution::common_hints::ExecutionMode;
 use crate::execution::entry_point::EntryPointExecutionContext;
-use crate::execution::syscalls::hint_processor::{SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR};
+use crate::execution::syscalls::hint_processor::{
+    SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR,
+};
 use crate::execution::syscalls::secp::SecpHintProcessor;
 use crate::state::state_api::State;
-
-use crate::execution::common_hints::ExecutionMode;
-
-use super::utils::encode_str_as_felts;
 
 pub struct NativeSyscallHandler<'state> {
     // Input for execution
