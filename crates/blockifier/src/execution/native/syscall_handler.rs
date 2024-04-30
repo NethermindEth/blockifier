@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::hash::RandomState;
+use std::collections::hash_map::RandomState;
 use std::sync::Arc;
 
 use cairo_felt::Felt252;

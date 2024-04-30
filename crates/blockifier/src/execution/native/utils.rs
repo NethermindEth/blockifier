@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::hash::RandomState;
+use std::collections::hash_map::RandomState;
 use std::rc::Rc;
 
 use ark_ec::short_weierstrass::SWCurveConfig;
