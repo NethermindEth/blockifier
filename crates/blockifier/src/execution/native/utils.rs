@@ -3,16 +3,17 @@ use std::collections::{HashMap, HashSet};
 use std::hash::RandomState;
 use std::rc::Rc;
 
-use ark_ff::BigInt;
+use ark_ec::short_weierstrass::SWCurveConfig;
+use ark_ff::{BigInt, PrimeField};
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
-use cairo_native::cache::{AotProgramCache, ProgramCache};
+use cairo_native::cache::{AotProgramCache, JitProgramCache, ProgramCache};
 use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
 use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
-use cairo_native::starknet::U256;
+use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
 use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use itertools::Itertools;
@@ -22,6 +23,7 @@ use starknet_api::core::{ClassHash, ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
+use starknet_api::transaction::Resource;
 use starknet_types_core::felt::Felt;
 
 use crate::execution::call_info::{
@@ -29,6 +31,9 @@ use crate::execution::call_info::{
 };
 use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use crate::execution::errors::EntryPointExecutionError;
+use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
+use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
+use crate::transaction::objects::CurrentTransactionInfo;
 
 #[cfg(test)]
 #[path = "utils_test.rs"]
@@ -68,10 +73,17 @@ pub fn match_entrypoint(
         })
 }
 
-static NATIVE_CONTEXT: std::sync::OnceLock<NativeContext> = std::sync::OnceLock::new();
+static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
+    std::sync::OnceLock::new();
 
 pub fn get_native_aot_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
     Rc::new(RefCell::new(ProgramCache::Aot(AotProgramCache::new(
+        NATIVE_CONTEXT.get_or_init(NativeContext::new),
+    ))))
+}
+
+pub fn get_native_jit_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
+    Rc::new(RefCell::new(ProgramCache::Jit(JitProgramCache::new(
         NATIVE_CONTEXT.get_or_init(NativeContext::new),
     ))))
 }
@@ -249,4 +261,71 @@ pub fn decode_felts_as_str(encoding: &[Felt]) -> String {
             format!("[{}]", err_msgs)
         }
     }
+}
+
+pub fn allocate_point<Curve: SWCurveConfig>(
+    point_x: U256,
+    point_y: U256,
+    hint_processor: &mut SecpHintProcessor<Curve>,
+) -> SyscallResult<usize>
+where
+    Curve::BaseField: PrimeField,
+{
+    let request = SecpNewRequest { x: u256_to_biguint(point_x), y: u256_to_biguint(point_y) };
+
+    let response = hint_processor.secp_new_unchecked(request);
+
+    match response {
+        // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
+        Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
+        Err(SyscallExecutionError::SyscallError { error_data }) => {
+            Err(error_data.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect())
+        }
+        Err(_) => unreachable!(
+            "Can't receive an error other than SyscallError from `secp_new_unchecked`."
+        ),
+    }
+}
+
+pub fn default_tx_v2_info() -> TxV2Info {
+    TxV2Info {
+        version: Default::default(),
+        account_contract_address: Default::default(),
+        max_fee: 0,
+        signature: vec![],
+        transaction_hash: Default::default(),
+        chain_id: Default::default(),
+        nonce: Default::default(),
+        resource_bounds: vec![],
+        tip: 0,
+        paymaster_data: vec![],
+        nonce_data_availability_mode: 0,
+        fee_data_availability_mode: 0,
+        account_deployment_data: vec![],
+    }
+}
+
+pub fn calculate_resource_bounds(
+    tx_info: &CurrentTransactionInfo,
+) -> SyscallResult<Vec<ResourceBounds>> {
+    let l1_gas = StarkFelt::try_from(L1_GAS).map_err(|e| encode_str_as_felts(&e.to_string()))?;
+    let l2_gas = StarkFelt::try_from(L2_GAS).map_err(|e| encode_str_as_felts(&e.to_string()))?;
+
+    Ok(tx_info
+        .resource_bounds
+        .0
+        .iter()
+        .map(|(resource, resource_bound)| {
+            let resource = match resource {
+                Resource::L1Gas => l1_gas,
+                Resource::L2Gas => l2_gas,
+            };
+
+            ResourceBounds {
+                resource: stark_felt_to_native_felt(resource),
+                max_amount: resource_bound.max_amount,
+                max_price_per_unit: resource_bound.max_price_per_unit,
+            }
+        })
+        .collect())
 }

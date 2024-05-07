@@ -144,8 +144,8 @@ fn test_get_execution_info(
             verify_compiler_version(test_contract, "2.1.0");
             (test_contract.get_instance_address(0), vec![])
         }
-        // FeatureContract::SierraTestContract
-        FeatureContract::TestContract(CairoVersion::Cairo1) => {
+        FeatureContract::SierraTestContract
+        | FeatureContract::TestContract(CairoVersion::Cairo1) => {
             (
                 test_contract.get_instance_address(0),
                 vec![

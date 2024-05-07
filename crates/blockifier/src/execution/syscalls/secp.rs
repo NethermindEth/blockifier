@@ -102,6 +102,27 @@ where
         Ok(SecpNewResponse { optional_ec_point_id })
     }
 
+    pub fn secp_new_unchecked(
+        &mut self,
+        request: SecpNewRequest,
+    ) -> SyscallResult<SecpNewResponse> {
+        let modulos = Curve::BaseField::MODULUS.into();
+        let (x, y) = (request.x, request.y);
+        if x >= modulos || y >= modulos {
+            return Err(SyscallExecutionError::SyscallError {
+                error_data: vec![
+                    StarkFelt::try_from(INVALID_ARGUMENT).map_err(SyscallExecutionError::from)?,
+                ],
+            });
+        }
+        let ec_point = if x.is_zero() && y.is_zero() {
+            short_weierstrass::Affine::<Curve>::identity()
+        } else {
+            short_weierstrass::Affine::<Curve>::new_unchecked(x.into(), y.into())
+        };
+        Ok(SecpNewResponse { optional_ec_point_id: Some(self.allocate_point(ec_point)) })
+    }
+
     fn allocate_point(&mut self, ec_point: short_weierstrass::Affine<Curve>) -> usize {
         let points = &mut self.points;
         let id = points.len();
@@ -320,7 +341,7 @@ pub fn secp256r1_mul(
 
 // SecpNew syscall.
 
-type SecpNewRequest = EcPointCoordinates;
+pub type SecpNewRequest = EcPointCoordinates;
 
 impl SyscallRequest for SecpNewRequest {
     fn read(vm: &VirtualMachine, ptr: &mut Relocatable) -> SyscallResult<SecpNewRequest> {
@@ -330,7 +351,7 @@ impl SyscallRequest for SecpNewRequest {
     }
 }
 
-type SecpNewResponse = SecpOptionalEcPointResponse;
+pub type SecpNewResponse = SecpOptionalEcPointResponse;
 
 pub fn secp256k1_new(
     request: SecpNewRequest,

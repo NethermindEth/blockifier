@@ -1,26 +1,36 @@
 use std::collections::HashSet;
 use std::hash::RandomState;
 
+// use std::sync::Arc;
+
+// use cairo_felt::Felt252;
 use cairo_native::starknet::{
-    ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarkNetSyscallHandler, SyscallResult, U256,
+    BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarkNetSyscallHandler,
+    SyscallResult, TxV2Info, U256,
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
+use num_traits::ToPrimitive;
 use starknet_api::core::{ContractAddress, EntryPointSelector};
+use starknet_api::data_availability::DataAvailabilityMode;
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
 use starknet_types_core::felt::Felt;
 
+use super::utils::{
+    contract_address_to_native_felt, encode_str_as_felts, stark_felt_to_native_felt,
+};
 use crate::abi::constants;
 use crate::execution::call_info::{CallInfo, OrderedEvent, OrderedL2ToL1Message};
+use crate::execution::common_hints::ExecutionMode;
 use crate::execution::entry_point::EntryPointExecutionContext;
-use crate::execution::syscalls::hint_processor::{SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR};
+use crate::execution::execution_utils::max_fee_for_execution_info;
+use crate::execution::native::utils::{calculate_resource_bounds, default_tx_v2_info};
+use crate::execution::syscalls::hint_processor::{
+    SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR,
+};
 use crate::execution::syscalls::secp::SecpHintProcessor;
 use crate::state::state_api::State;
-
-use crate::execution::common_hints::ExecutionMode;
-
-use super::utils::encode_str_as_felts;
-
+use crate::transaction::objects::TransactionInfo;
 pub struct NativeSyscallHandler<'state> {
     // Input for execution
     pub state: &'state mut dyn State,
@@ -123,9 +133,90 @@ impl<'state> StarkNetSyscallHandler for NativeSyscallHandler<'state> {
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<ExecutionInfoV2> {
-        unimplemented!("implement get_execution_info_v2")
-    }
+        // Get Block Info
+        let block_info = &self.execution_context.tx_context.block_context.block_info;
+        let native_block_info: BlockInfo = if self.execution_context.execution_mode
+            == ExecutionMode::Validate
+        {
+            let versioned_constants = self.execution_context.versioned_constants();
+            let block_number = block_info.block_number.0;
+            let block_timestamp = block_info.block_timestamp.0;
+            // Round down to the nearest multiple of validate_block_number_rounding.
+            let validate_block_number_rounding =
+                versioned_constants.get_validate_block_number_rounding();
+            let rounded_block_number =
+                (block_number / validate_block_number_rounding) * validate_block_number_rounding;
+            // Round down to the nearest multiple of validate_timestamp_rounding.
+            let validate_timestamp_rounding = versioned_constants.get_validate_timestamp_rounding();
+            let rounded_timestamp =
+                (block_timestamp / validate_timestamp_rounding) * validate_timestamp_rounding;
+            BlockInfo {
+                block_number: rounded_block_number,
+                block_timestamp: rounded_timestamp,
+                sequencer_address: Felt::ZERO,
+            }
+        } else {
+            BlockInfo {
+                block_number: block_info.block_number.0,
+                block_timestamp: block_info.block_timestamp.0,
+                sequencer_address: contract_address_to_native_felt(block_info.sequencer_address),
+            }
+        };
 
+        // Get Transaction Info
+        let tx_info = &self.execution_context.tx_context.tx_info;
+        let mut native_tx_info = TxV2Info {
+            version: stark_felt_to_native_felt(tx_info.signed_version().0),
+            account_contract_address: contract_address_to_native_felt(tx_info.sender_address()),
+            max_fee: max_fee_for_execution_info(tx_info).to_u128().unwrap(),
+            signature: tx_info.signature().0.into_iter().map(stark_felt_to_native_felt).collect(),
+            transaction_hash: stark_felt_to_native_felt(tx_info.transaction_hash().0),
+            chain_id: Felt::from_hex(
+                &self.execution_context.tx_context.block_context.chain_info.chain_id.as_hex(),
+            )
+            .unwrap(),
+            nonce: stark_felt_to_native_felt(tx_info.nonce().0),
+            ..default_tx_v2_info()
+        };
+        // If handling V3 transaction fill the "default" fields
+        if let TransactionInfo::Current(context) = tx_info {
+            let to_u32 = |x| match x {
+                DataAvailabilityMode::L1 => 0,
+                DataAvailabilityMode::L2 => 1,
+            };
+            native_tx_info = TxV2Info {
+                resource_bounds: calculate_resource_bounds(context)?,
+                tip: context.tip.0.into(),
+                paymaster_data: context
+                    .paymaster_data
+                    .0
+                    .iter()
+                    .map(|f| stark_felt_to_native_felt(*f))
+                    .collect(),
+                nonce_data_availability_mode: to_u32(context.nonce_data_availability_mode),
+                fee_data_availability_mode: to_u32(context.fee_data_availability_mode),
+                account_deployment_data: context
+                    .account_deployment_data
+                    .0
+                    .iter()
+                    .map(|f| stark_felt_to_native_felt(*f))
+                    .collect(),
+                ..native_tx_info
+            };
+        }
+
+        let caller_address = contract_address_to_native_felt(self.caller_address);
+        let contract_address = contract_address_to_native_felt(self.contract_address);
+        let entry_point_selector = stark_felt_to_native_felt(self.entry_point_selector);
+
+        Ok(ExecutionInfoV2 {
+            block_info: native_block_info,
+            tx_info: native_tx_info,
+            caller_address,
+            contract_address,
+            entry_point_selector,
+        })
+    }
     fn deploy(
         &mut self,
         _class_hash: Felt,
