@@ -13,7 +13,7 @@ use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
 use cairo_native::metadata::syscall_handler::SyscallHandlerMeta;
-use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
+use cairo_native::starknet::{ResourceBounds, SyscallResult, TxInfo, TxV2Info, U256};
 use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use itertools::Itertools;
@@ -302,6 +302,18 @@ pub fn default_tx_v2_info() -> TxV2Info {
         nonce_data_availability_mode: 0,
         fee_data_availability_mode: 0,
         account_deployment_data: vec![],
+    }
+}
+
+pub fn default_tx_info() -> TxInfo {
+    TxInfo {
+        version: Default::default(),
+        account_contract_address: Default::default(),
+        max_fee: 0,
+        signature: vec![],
+        transaction_hash: Default::default(),
+        chain_id: Default::default(),
+        nonce: Default::default(),
     }
 }
 
