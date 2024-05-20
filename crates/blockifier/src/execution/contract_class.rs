@@ -130,7 +130,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -516,7 +516,7 @@ impl ClassInfo {
         let (contract_class_version, condition) = match contract_class {
             ContractClass::V0(_) => (0, sierra_program_length == 0),
             ContractClass::V1(_) => (1, sierra_program_length > 0),
-            ContractClass::V1Sierra(_) => todo!("Sierra contract class version and condition"),
+            ContractClass::V1Sierra(_) => (1, sierra_program_length > 0),
         };
 
         if condition {
