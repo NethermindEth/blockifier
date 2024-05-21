@@ -5,7 +5,7 @@ use std::sync::Arc;
 use cairo_felt::Felt252;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
-    SyscallResult, TxV2Info, U256,
+    SyscallResult, TxInfo, TxV2Info, U256,
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use num_traits::ToPrimitive;
@@ -140,7 +140,43 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<cairo_native::starknet::ExecutionInfo> {
-        panic!("Blockifier doesn't use this syscall")
+        let block_context = &self.execution_context.tx_context.block_context.block_info;
+        let account_tx_context = &self.execution_context.tx_context.tx_info;
+
+        let block_info: BlockInfo = BlockInfo {
+            block_number: block_context.block_number.0,
+            block_timestamp: block_context.block_timestamp.0,
+            sequencer_address: contract_address_to_native_felt(block_context.sequencer_address),
+        };
+
+        let chain_id = &self.execution_context.tx_context.block_context.chain_info.chain_id;
+
+        let signature =
+            account_tx_context.signature().0.into_iter().map(stark_felt_to_native_felt).collect();
+
+        let tx_info = TxInfo {
+            version: stark_felt_to_native_felt(account_tx_context.version().0),
+            account_contract_address: contract_address_to_native_felt(
+                account_tx_context.sender_address(),
+            ),
+            max_fee: account_tx_context.max_fee().unwrap_or_default().0,
+            signature,
+            transaction_hash: stark_felt_to_native_felt(account_tx_context.transaction_hash().0),
+            chain_id: Felt::from_hex(&chain_id.as_hex()).unwrap(),
+            nonce: stark_felt_to_native_felt(account_tx_context.nonce().0),
+        };
+
+        let caller_address = contract_address_to_native_felt(self.caller_address);
+        let contract_address = contract_address_to_native_felt(self.contract_address);
+        let entry_point_selector = stark_felt_to_native_felt(self.entry_point_selector);
+
+        Ok(cairo_native::starknet::ExecutionInfo {
+            block_info,
+            tx_info,
+            caller_address,
+            contract_address,
+            entry_point_selector,
+        })
     }
 
     fn get_execution_info_v2(
