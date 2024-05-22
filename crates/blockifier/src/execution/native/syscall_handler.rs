@@ -136,34 +136,53 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         }
     }
 
+    // TODO: This method is untested!!!
     fn get_execution_info(
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<cairo_native::starknet::ExecutionInfo> {
-        let block_context = &self.execution_context.tx_context.block_context.block_info;
-        let account_tx_context = &self.execution_context.tx_context.tx_info;
-
-        let block_info: BlockInfo = BlockInfo {
-            block_number: block_context.block_number.0,
-            block_timestamp: block_context.block_timestamp.0,
-            sequencer_address: contract_address_to_native_felt(block_context.sequencer_address),
+        let block_info = &self.execution_context.tx_context.block_context.block_info;
+        let native_block_info: BlockInfo = if self.execution_context.execution_mode
+            == ExecutionMode::Validate
+        {
+            // TODO: Literal copy from get execution info v2, could be refactored
+            let versioned_constants = self.execution_context.versioned_constants();
+            let block_number = block_info.block_number.0;
+            let block_timestamp = block_info.block_timestamp.0;
+            // Round down to the nearest multiple of validate_block_number_rounding.
+            let validate_block_number_rounding =
+                versioned_constants.get_validate_block_number_rounding();
+            let rounded_block_number =
+                (block_number / validate_block_number_rounding) * validate_block_number_rounding;
+            // Round down to the nearest multiple of validate_timestamp_rounding.
+            let validate_timestamp_rounding = versioned_constants.get_validate_timestamp_rounding();
+            let rounded_timestamp =
+                (block_timestamp / validate_timestamp_rounding) * validate_timestamp_rounding;
+            BlockInfo {
+                block_number: rounded_block_number,
+                block_timestamp: rounded_timestamp,
+                sequencer_address: Felt::ZERO,
+            }
+        } else {
+            BlockInfo {
+                block_number: block_info.block_number.0,
+                block_timestamp: block_info.block_timestamp.0,
+                sequencer_address: contract_address_to_native_felt(block_info.sequencer_address),
+            }
         };
 
-        let chain_id = &self.execution_context.tx_context.block_context.chain_info.chain_id;
-
-        let signature =
-            account_tx_context.signature().0.into_iter().map(stark_felt_to_native_felt).collect();
-
-        let tx_info = TxInfo {
-            version: stark_felt_to_native_felt(account_tx_context.version().0),
-            account_contract_address: contract_address_to_native_felt(
-                account_tx_context.sender_address(),
-            ),
-            max_fee: account_tx_context.max_fee().unwrap_or_default().0,
-            signature,
-            transaction_hash: stark_felt_to_native_felt(account_tx_context.transaction_hash().0),
-            chain_id: Felt::from_hex(&chain_id.as_hex()).unwrap(),
-            nonce: stark_felt_to_native_felt(account_tx_context.nonce().0),
+        let tx_info = &self.execution_context.tx_context.tx_info;
+        let native_tx_info = TxInfo {
+            version: stark_felt_to_native_felt(tx_info.version().0),
+            account_contract_address: contract_address_to_native_felt(tx_info.sender_address()),
+            max_fee: tx_info.max_fee().unwrap_or_default().0,
+            signature: tx_info.signature().0.into_iter().map(stark_felt_to_native_felt).collect(),
+            transaction_hash: stark_felt_to_native_felt(tx_info.transaction_hash().0),
+            chain_id: Felt::from_hex(
+                &self.execution_context.tx_context.block_context.chain_info.chain_id.as_hex(),
+            )
+            .unwrap(),
+            nonce: stark_felt_to_native_felt(tx_info.nonce().0),
         };
 
         let caller_address = contract_address_to_native_felt(self.caller_address);
@@ -171,8 +190,8 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         let entry_point_selector = stark_felt_to_native_felt(self.entry_point_selector);
 
         Ok(cairo_native::starknet::ExecutionInfo {
-            block_info,
-            tx_info,
+            block_info: native_block_info,
+            tx_info: native_tx_info,
             caller_address,
             contract_address,
             entry_point_selector,
