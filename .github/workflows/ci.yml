@@ -60,9 +60,9 @@ jobs:
       - run: scripts/clippy.sh
         env:
           CAIRO_NATIVE_RUNTIME_LIBRARY: ${{ steps.native-deps.outputs.cairo-native-runtime-library }}
-          MLIR_SYS_170_PREFIX: /usr/lib/llvm-17/
-          LLVM_SYS_170_PREFIX: /usr/lib/llvm-17/
-          TABLEGEN_170_PREFIX: /usr/lib/llvm-17/
+          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
+          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
+          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
 
   run-python-tests:
     runs-on: ubuntu-latest
@@ -88,9 +88,9 @@ jobs:
       - run: cargo test --features testing
         env:
           CAIRO_NATIVE_RUNTIME_LIBRARY: ${{ steps.native-deps.outputs.cairo-native-runtime-library }}
-          MLIR_SYS_170_PREFIX: /usr/lib/llvm-17/
-          LLVM_SYS_170_PREFIX: /usr/lib/llvm-17/
-          TABLEGEN_170_PREFIX: /usr/lib/llvm-17/
+          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
+          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
+          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
 
   run-concurrency-tests:
     runs-on: ubuntu-latest
@@ -104,9 +104,9 @@ jobs:
       - run: cargo test --features concurrency
         env:
           CAIRO_NATIVE_RUNTIME_LIBRARY: ${{ steps.native-deps.outputs.cairo-native-runtime-library }}
-          MLIR_SYS_170_PREFIX: /usr/lib/llvm-17/
-          LLVM_SYS_170_PREFIX: /usr/lib/llvm-17/
-          TABLEGEN_170_PREFIX: /usr/lib/llvm-17/
+          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
+          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
+          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
   
 
   udeps:
@@ -127,6 +127,6 @@ jobs:
           cargo-udeps-*/cargo-udeps udeps
         env:
           RUSTUP_TOOLCHAIN: nightly-2024-01-12
-          MLIR_SYS_170_PREFIX: /usr/lib/llvm-17/
-          LLVM_SYS_170_PREFIX: /usr/lib/llvm-17/
-          TABLEGEN_170_PREFIX: /usr/lib/llvm-17/
+          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
+          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
+          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
