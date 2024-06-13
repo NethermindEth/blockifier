@@ -19,7 +19,10 @@ pub const DECIMALS: u128 = 18;
 
 #[test]
 fn should_deploy() {
-    let (_contract_address, _state) = prepare_erc20_deploy_test_state();
+    let (_contract_address, _state) = match prepare_erc20_deploy_test_state() {
+        Ok((contract_address, state)) => (contract_address, state),
+        Err(e) => panic!("Failed to prepare test state: {}", e),
+    };
 }
 
 #[cfg(test)]
