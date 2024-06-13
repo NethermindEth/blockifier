@@ -39,7 +39,8 @@ use crate::execution::entry_point::{
 };
 use crate::execution::execution_utils::{execute_deployment, felt_to_stark_felt};
 use crate::execution::native::utils::{
-    contract_address_to_native_felt, decode_felts_as_str, native_felt_to_stark_felt, stark_felt_to_native_felt
+    contract_address_to_native_felt, decode_felts_as_str, native_felt_to_stark_felt,
+    stark_felt_to_native_felt,
 };
 use crate::execution::syscalls::hint_processor::{
     FAILED_TO_CALCULATE_CONTRACT_ADDRESS, FAILED_TO_EXECUTE_CALL,
@@ -531,7 +532,8 @@ pub fn deploy_contract(
     Ok((contract_address_felt, return_data))
 }
 
-pub fn prepare_erc20_deploy_test_state() -> Result<(ContractAddress, CachedState<DictStateReader>), String> {
+pub fn prepare_erc20_deploy_test_state()
+-> Result<(ContractAddress, CachedState<DictStateReader>), String> {
     let mut state = create_erc20_deploy_test_state();
 
     let class_hash = match Felt::from_hex(TEST_ERC20_FULL_CONTRACT_CLASS_HASH) {
@@ -552,7 +554,8 @@ pub fn prepare_erc20_deploy_test_state() -> Result<(ContractAddress, CachedState
         Err(e) => return Err(format!("Failed to deploy contract: {}", decode_felts_as_str(&e))),
     };
 
-    let contract_address = match PatriciaKey::try_from(native_felt_to_stark_felt(contract_address)) {
+    let contract_address = match PatriciaKey::try_from(native_felt_to_stark_felt(contract_address))
+    {
         Ok(key) => ContractAddress(key),
         Err(e) => return Err(format!("Failed to convert contract address: {}", e)),
     };
