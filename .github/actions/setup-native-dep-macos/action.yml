@@ -20,7 +20,4 @@ runs:
       run: |
         cd ./cairo_native &&
         make deps &&
-        source env-macos.sh &&
-        make build &&
-        echo "cairo-native-runtime-library=$(pwd)/libcairo_native_runtime.a" >> $GITHUB_OUTPUT &&
-        cd ..
+        source env-macos.sh
