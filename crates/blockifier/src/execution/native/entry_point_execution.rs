@@ -66,6 +66,8 @@ pub fn execute_entry_point_call(
     let sierra_entry_function_id =
         get_sierra_entry_function_id(matching_entrypoint, sierra_program);
 
+    println!("Calldata: {:?}", call.calldata.0);
+
     match now.elapsed() {
         Ok(elapsed) => {
             println!("Setup finished after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));

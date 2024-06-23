@@ -154,6 +154,8 @@ pub fn run_native_executor(
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
     };
 
+    println!("Converted calldata: {:?}", stark_felts_to_native_felts(&call.calldata.0));
+
     let execution_result = match native_executor {
         NativeExecutor::Aot(executor) => executor.invoke_contract_dynamic(
             sierra_entry_function_id,
