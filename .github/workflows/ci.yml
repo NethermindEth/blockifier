@@ -85,12 +85,7 @@ jobs:
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep-macos
         id: native-deps
-      - run: cargo test --features testing
-        env:
-          CAIRO_NATIVE_RUNTIME_LIBRARY: ${{ steps.native-deps.outputs.cairo-native-runtime-library }}
-          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
-          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
-          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
+      - run: cd ./cairo_native; source ./env-macos.sh; cd ..; cargo test --features testing
 
   run-concurrency-tests:
     runs-on: macos-14
