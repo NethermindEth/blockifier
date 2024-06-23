@@ -11,8 +11,8 @@ runs:
     - name: Fetch Cairo Native Repository
       uses: actions/checkout@v3
       with:
-        repository: "lambdaclass/cairo_native"
-        ref: "main"
+        repository: "nethermindEth/cairo_native"
+        ref: "Dom/macos-test"
         path: "cairo_native"
     - name: Install Cairo Native Runtime Dependencies
       id: set-env-vars
