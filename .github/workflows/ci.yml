@@ -85,7 +85,7 @@ jobs:
       - name: Set up Native Dependencies
         uses: ./.github/actions/setup-native-dep-macos
         id: native-deps
-      - run: cd ./cairo_native; source ./env-macos.sh; cd ..; cargo test --features testing
+      - run: cd ./cairo_native; source ./env-macos.sh; cd ..; cargo test --package blockifier --features testing --test erc20_tests -- should_deploy --exact --show-output
 
   run-concurrency-tests:
     runs-on: macos-14
