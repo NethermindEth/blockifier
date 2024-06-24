@@ -76,7 +76,23 @@ jobs:
           pip install pytest
       - run: pytest scripts/merge_paths_test.py
 
-  run-tests:
+  run-linux-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Set up Native Dependencies
+        uses: ./.github/actions/setup-native-dep
+        id: native-deps
+      - run: cd ./cairo_native; source ./env-macos.sh; cd ..; cargo test --package blockifier --features testing --test erc20_tests -- should_deploy --exact --show-output
+        env:
+          CAIRO_NATIVE_RUNTIME_LIBRARY: ${{ steps.native-deps.outputs.cairo-native-runtime-library }}
+          MLIR_SYS_180_PREFIX: /usr/lib/llvm-18/
+          LLVM_SYS_180_PREFIX: /usr/lib/llvm-18/
+          TABLEGEN_180_PREFIX: /usr/lib/llvm-18/
+
+  run-mac-tests:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
