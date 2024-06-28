@@ -29,7 +29,8 @@ fn test_secp256k1(entry_point: &str) {
 
 /// Start the execution of test_contract.cairo from the entry_point.
 ///
-/// This requires that test_contract.cairo already has been compiled to sierra_test_contract.sierra.json and test_contract.casm.json.
+/// This requires that test_contract.cairo already has been compiled to
+/// sierra_test_contract.sierra.json and test_contract.casm.json.
 fn run_secp256k1(test_contract: FeatureContract, entry_point: &str) -> CallInfo {
     let chain_info = &ChainInfo::create_for_testing();
     let mut state = test_state(chain_info, BALANCE, &[(test_contract, 1)]);
