@@ -53,7 +53,7 @@ where
         if request.x >= modulos {
             return Err(SyscallExecutionError::SyscallError {
                 error_data: vec![
-                    StarkFelt::try_from(INVALID_ARGUMENT).map_err(SyscallExecutionError::from)?,
+                    StarkFelt::try_from(INVALID_ARGUMENT).map_err(SyscallExecutionError::from)?
                 ],
             });
         }
@@ -62,7 +62,11 @@ where
         let maybe_ec_point = short_weierstrass::Affine::<Curve>::get_ys_from_x_unchecked(x)
             .map(|(smaller, greater)| {
                 // Return the correct y coordinate based on the parity.
-                if smaller.into_bigint().is_odd() == request.y_parity { smaller } else { greater }
+                if smaller.into_bigint().is_odd() == request.y_parity {
+                    smaller
+                } else {
+                    greater
+                }
             })
             .map(|y| short_weierstrass::Affine::<Curve>::new_unchecked(x, y))
             .filter(|p| p.is_in_correct_subgroup_assuming_on_curve());
@@ -101,7 +105,7 @@ where
         if x >= modulos || y >= modulos {
             return Err(SyscallExecutionError::SyscallError {
                 error_data: vec![
-                    StarkFelt::try_from(INVALID_ARGUMENT).map_err(SyscallExecutionError::from)?,
+                    StarkFelt::try_from(INVALID_ARGUMENT).map_err(SyscallExecutionError::from)?
                 ],
             });
         }
@@ -113,7 +117,8 @@ where
         Ok(SecpNewResponse { optional_ec_point_id: Some(self.allocate_point(ec_point)) })
     }
 
-    fn allocate_point(&mut self, ec_point: short_weierstrass::Affine<Curve>) -> usize {
+    // see if you can undo making this public
+    pub fn allocate_point(&mut self, ec_point: short_weierstrass::Affine<Curve>) -> usize {
         let points = &mut self.points;
         let id = points.len();
         points.push(ec_point);

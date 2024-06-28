@@ -42,8 +42,8 @@ use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };
 use crate::execution::syscalls::secp::{
-    SecpAddRequest, SecpAddResponse, SecpGetPointFromXRequest, SecpGetPointFromXResponse,
-    SecpHintProcessor, SecpMulRequest, SecpMulResponse, SecpNewRequest, SecpNewResponse,
+    SecpGetPointFromXRequest, SecpGetPointFromXResponse, SecpHintProcessor, SecpMulRequest,
+    SecpMulResponse, SecpNewRequest, SecpNewResponse,
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
@@ -715,17 +715,11 @@ where
         p0: Secp256Point<Curve>,
         p1: Secp256Point<Curve>,
     ) -> Result<Secp256Point<Curve>, Vec<Felt>> {
-        let p_p0 = allocate_point(p0.x, p0.y, self)?;
-        let p_p1 = allocate_point(p1.x, p1.y, self)?;
-        let request = SecpAddRequest { lhs_id: Felt252::from(p_p0), rhs_id: Felt252::from(p_p1) };
-
-        match self.secp_add(request) {
-            Ok(SecpAddResponse { ec_point_id: id }) => self.get_secp256point_by_id(id),
-            Err(SyscallExecutionError::SyscallError { error_data }) => {
-                Err(error_data.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect())
-            }
-            Err(error) => Err(encode_str_as_felts(&error.to_string())),
-        }
+        let lhs = Affine::<Curve>::new(u256_to_biguint(p0.x).into(), u256_to_biguint(p0.y).into());
+        let rhs = Affine::<Curve>::new(u256_to_biguint(p1.x).into(), u256_to_biguint(p1.y).into());
+        let result = lhs + rhs;
+        let ec_point_id = self.allocate_point(result.into());
+        self.get_secp256point_by_id(ec_point_id)
     }
 
     fn mul(&mut self, p: Secp256Point<Curve>, m: U256) -> Result<Secp256Point<Curve>, Vec<Felt>> {
