@@ -18,8 +18,10 @@ mod TestContract {
         eth_address::U256IntoEthAddress, EthAddress, secp256_trait::{Signature, is_valid_signature},
         secp256r1::{Secp256r1Point, Secp256r1Impl}, eth_signature::verify_eth_signature,
         info::{BlockInfo, SyscallResultTrait}, info::v2::{ExecutionInfo, TxInfo, ResourceBounds,},
-        syscalls
+        syscalls, secp256k1::Secp256k1Point, secp256_trait::secp256_ec_negate_scalar
     };
+
+    use core::math::{u256_mul_mod_n, u256_inv_mod};
 
     #[storage]
     struct Storage {
@@ -219,6 +221,43 @@ mod TestContract {
             ),
         }
     }
+    
+    #[external(v0)] 
+    fn test_secp256k1_get_point_from_x(ref self: ContractState) -> (u256, u256) {
+        // magic values are taken from get_message_and_secp256k1_signature
+        let r = 0x4c8e4fbc1fbb1dece52185e532812c4f7a5f81cf3ee10044320a0d03b62d3e9a;
+        let y_parity = true;
+        let r_point = starknet::secp256k1::secp256k1_get_point_from_x_syscall(x: r, :y_parity)
+             .unwrap_syscall().unwrap(); 
+        
+        let (x_coord, y_coord) = starknet::secp256k1::secp256k1_get_xy_syscall(r_point).unwrap_syscall();
+ 
+        (x_coord, y_coord)
+    }
+
+    #[external(v0)]
+    fn test_secp256k1_mul(ref self: ContractState) -> (u256, u256) {
+        // magic values are taken from get_message_and_secp256k1_signature
+        let msg_hash = 0xe888fbb4cf9ae6254f19ba12e6d9af54788f195a6f509ca3e934f78d7a71dd85;
+        let r : u256 = 0x4c8e4fbc1fbb1dece52185e532812c4f7a5f81cf3ee10044320a0d03b62d3e9a;
+        
+        // This particular multiplication is taken from recover_public_key.
+
+        let generator_point : Secp256k1Point = starknet::secp256k1::Secp256Trait::<Secp256k1Point>::get_generator_point();
+
+        let n_nz_w : u256 = starknet::secp256k1::Secp256Trait::<Secp256k1Point>::get_curve_size();
+        let n_nz = n_nz_w.try_into().unwrap();
+        let r_inv = u256_inv_mod(r.try_into().unwrap(), n_nz).unwrap().into();
+
+        let u1 = u256_mul_mod_n(msg_hash, r_inv, n_nz);
+        let minus_u1 : u256 = secp256_ec_negate_scalar::<Secp256k1Point>(u1);
+
+        let minus_point1 : Secp256k1Point = starknet::secp256k1::Secp256PointTrait::mul(generator_point, minus_u1).unwrap_syscall();
+
+        let (x_point1, y_point1) = starknet::secp256k1::secp256k1_get_xy_syscall(minus_point1).unwrap_syscall();
+
+        (x_point1, y_point1)
+    } 
 
     #[external(v0)]
     fn test_secp256k1(ref self: ContractState) {
