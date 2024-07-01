@@ -711,17 +711,8 @@ where
 
             Err(vec![error])
         } else {
-            let ec_point = if x.is_zero() && y.is_zero() {
-                Affine::<Curve>::identity()
-            } else {
-                Affine::<Curve>::new_unchecked(x.into(), y.into())
-            };
-
-            if ec_point.is_on_curve() && ec_point.is_in_correct_subgroup_assuming_on_curve() {
-                Ok(Some(ec_point.into()))
-            } else {
-                Ok(None)
-            }
+            // Maybe re-inline this again because it also checks for modulus
+            Ok(maybe_new(x.into(), y.into()).map(|p| p.into()))
         }
     }
 
@@ -783,6 +774,26 @@ where
         let y = big4int_to_u256(point.y.into());
 
         Ok(Secp256Point::new(swap(x), swap(y)))
+    }
+}
+
+// Todo what is the correct way of naming this thing within rust
+// Also allude to Affine
+fn maybe_new<Curve: SWCurveConfig>(
+    x: Curve::BaseField,
+    y: Curve::BaseField,
+) -> Option<Affine<Curve>> {
+    // use match for a better
+    let ec_point = if x.is_zero() && y.is_zero() {
+        Affine::<Curve>::identity()
+    } else {
+        Affine::<Curve>::new_unchecked(x, y)
+    };
+
+    if ec_point.is_on_curve() && ec_point.is_in_correct_subgroup_assuming_on_curve() {
+        Some(ec_point)
+    } else {
+        None
     }
 }
 
