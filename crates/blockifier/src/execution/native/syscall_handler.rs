@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
-use cairo_felt::Felt252;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
     SyscallResult, TxInfo, TxV2Info, U256,
@@ -42,9 +41,7 @@ use crate::execution::syscalls::exceeds_event_size_limit;
 use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };
-use crate::execution::syscalls::secp::{
-    SecpGetPointFromXRequest, SecpGetPointFromXResponse, SecpHintProcessor,
-};
+use crate::execution::syscalls::secp::SecpHintProcessor;
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
 pub struct NativeSyscallHandler<'state> {
@@ -709,11 +706,11 @@ where
                 })?;
             let error = stark_felt_to_native_felt(error);
 
-            Err(vec![error])
-        } else {
-            // Maybe re-inline this again because it also checks for modulus
-            Ok(maybe_new(x.into(), y.into()).map(|p| p.into()))
+            return Err(vec![error]);
         }
+
+        // Maybe re-inline this again because it also checks for modulus
+        Ok(maybe_affine(x.into(), y.into()).map(|p| p.into()))
     }
 
     fn add(
@@ -740,46 +737,39 @@ where
         x: U256,
         y_parity: bool,
     ) -> Result<Option<Secp256Point<Curve>>, Vec<Felt>> {
-        let request = SecpGetPointFromXRequest { x: u256_to_biguint(x), y_parity };
+        let modulos = Curve::BaseField::MODULUS.into();
+        let x = u256_to_biguint(x);
 
-        match self.secp_get_point_from_x(request) {
-            Ok(SecpGetPointFromXResponse { optional_ec_point_id: Some(id) }) => {
-                self.get_secp256point_by_id(id).map(Some)
-            }
-            Ok(SecpGetPointFromXResponse { optional_ec_point_id: None }) => Ok(None),
-            Err(SyscallExecutionError::SyscallError { error_data }) => {
-                Err(error_data.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect())
-            }
-            Err(error) => Err(encode_str_as_felts(&error.to_string())),
-        }
-    }
+        if x >= modulos {
+            let error =
+                StarkFelt::try_from(crate::execution::syscalls::hint_processor::INVALID_ARGUMENT)
+                    .map_err(|err| {
+                    encode_str_as_felts(&SyscallExecutionError::from(err).to_string())
+                })?;
+            let error = stark_felt_to_native_felt(error);
 
-    fn get_secp256point_by_id(&mut self, id: usize) -> Result<Secp256Point<Curve>, Vec<Felt>> {
-        // A workaround for turning big4int into a u256 that matches the way the
-        // result of native and VM are displayed.
-        // Having to swap around is most-likely a bug, but best investigated after
-        // this issue (TODO(xrvdg) Github link)
-        fn swap(x: U256) -> U256 {
-            U256 { hi: x.lo, lo: x.hi }
+            return Err(vec![error]);
         }
 
-        let id = Felt252::from(id);
+        let x = x.into();
+        let maybe_ec_point = Affine::<Curve>::get_ys_from_x_unchecked(x)
+            .map(|(smaller, greater)| {
+                // Return the correct y coordinate based on the parity.
+                if ark_ff::BigInteger::is_odd(&smaller.into_bigint()) == y_parity {
+                    smaller
+                } else {
+                    greater
+                }
+            })
+            .map(|y| Affine::<Curve>::new_unchecked(x, y))
+            .filter(|p| p.is_in_correct_subgroup_assuming_on_curve());
 
-        let point: &Affine<Curve> =
-            self.get_point_by_id(id).map_err(|error| encode_str_as_felts(&error.to_string()))?;
-
-        // Here /into/ must be used, accessing the BigInt via .0 will lead to an
-        // transformation being missed.
-        let x = big4int_to_u256(point.x.into());
-        let y = big4int_to_u256(point.y.into());
-
-        Ok(Secp256Point::new(swap(x), swap(y)))
+        Ok(maybe_ec_point.map(|p| p.into()))
     }
 }
 
-// Todo what is the correct way of naming this thing within rust
-// Also allude to Affine
-fn maybe_new<Curve: SWCurveConfig>(
+/// Similar to Affine<Curve>::new, but with checks for 0 and non-panickly
+fn maybe_affine<Curve: SWCurveConfig>(
     x: Curve::BaseField,
     y: Curve::BaseField,
 ) -> Option<Affine<Curve>> {
