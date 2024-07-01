@@ -3,7 +3,7 @@ use std::hash::RandomState;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use ark_ec::short_weierstrass::{Affine, SWCurveConfig};
+use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
 use cairo_felt::Felt252;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
@@ -717,9 +717,9 @@ where
     ) -> Result<Secp256Point<Curve>, Vec<Felt>> {
         let lhs: Affine<Curve> = p0.into();
         let rhs: Affine<Curve> = p1.into();
-        let result = lhs + rhs;
-        let ec_point_id = self.allocate_point(result.into());
-        self.get_secp256point_by_id(ec_point_id)
+        let result: Projective<Curve> = lhs + rhs;
+        let result: Affine<Curve> = result.into();
+        Ok(result.into())
     }
 
     fn mul(&mut self, p: Secp256Point<Curve>, m: U256) -> Result<Secp256Point<Curve>, Vec<Felt>> {
@@ -748,8 +748,7 @@ where
         }
     }
 
-    fn get_secp256point_by_id(&mut self, id: usize) -> Result<Secp256Point<Curve>, Vec<Felt>>
-where {
+    fn get_secp256point_by_id(&mut self, id: usize) -> Result<Secp256Point<Curve>, Vec<Felt>> {
         // A workaround for turning big4int into a u256 that matches the way the
         // result of native and VM are displayed.
         // Having to swap around is most-likely a bug, but best investigated after
@@ -820,5 +819,27 @@ where
 {
     fn from(p: Secp256Point<Curve>) -> Self {
         Affine::<Curve>::new(u256_to_biguint(p.x).into(), u256_to_biguint(p.y).into())
+    }
+}
+
+impl<Curve: SWCurveConfig> From<Affine<Curve>> for Secp256Point<Curve>
+where
+    ark_ff::BigInt<4>: From<<Curve>::BaseField>,
+{
+    fn from(point: Affine<Curve>) -> Self {
+        // A workaround for turning big4int into a u256 that matches the way the
+        // result of native and VM are displayed.
+        // Having to swap around is most-likely a bug, but best investigated after
+        // this issue (TODO(xrvdg) Github link)
+        fn swap(x: U256) -> U256 {
+            U256 { hi: x.lo, lo: x.hi }
+        }
+
+        // Here /into/ must be used, accessing the BigInt via .0 will lead to an
+        // transformation being missed.
+        let x = big4int_to_u256(point.x.into());
+        let y = big4int_to_u256(point.y.into());
+
+        Secp256Point::new(swap(x), swap(y))
     }
 }
