@@ -725,8 +725,8 @@ where
     fn mul(&mut self, p: Secp256Point<Curve>, m: U256) -> Result<Secp256Point<Curve>, Vec<Felt>> {
         let p: Affine<Curve> = p.into();
         let result = p * Curve::ScalarField::from(u256_to_biguint(m));
-        let ec_point_id = self.allocate_point(result.into());
-        self.get_secp256point_by_id(ec_point_id)
+        let result: Affine<Curve> = result.into();
+        Ok(result.into())
     }
 
     fn get_point_from_x(
