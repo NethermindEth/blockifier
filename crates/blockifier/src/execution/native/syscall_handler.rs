@@ -11,6 +11,7 @@ use cairo_native::starknet::{
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use num_traits::ToPrimitive;
+use num_traits::Zero;
 use starknet_api::core::{
     calculate_contract_address, ClassHash, ContractAddress, EntryPointSelector, EthAddress,
     PatriciaKey,
@@ -42,8 +43,7 @@ use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };
 use crate::execution::syscalls::secp::{
-    SecpGetPointFromXRequest, SecpGetPointFromXResponse, SecpHintProcessor, SecpNewRequest,
-    SecpNewResponse,
+    SecpGetPointFromXRequest, SecpGetPointFromXResponse, SecpHintProcessor,
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
@@ -697,16 +697,31 @@ where
     ark_ff::BigInt<4>: From<<Curve>::BaseField>, // constraint for point to bigint
 {
     fn secp256_new(&mut self, x: U256, y: U256) -> Result<Option<Secp256Point<Curve>>, Vec<Felt>> {
-        let request = SecpNewRequest { x: u256_to_biguint(x), y: u256_to_biguint(y) };
+        let x = u256_to_biguint(x);
+        let y = u256_to_biguint(y);
+        let modulos = Curve::BaseField::MODULUS.into();
 
-        match self.secp_new(request) {
-            Ok(SecpNewResponse { optional_ec_point_id }) => {
-                Ok(optional_ec_point_id.map(|_| Secp256Point::new(x, y)))
+        if x >= modulos || y >= modulos {
+            let error =
+                StarkFelt::try_from(crate::execution::syscalls::hint_processor::INVALID_ARGUMENT)
+                    .map_err(|err| {
+                    encode_str_as_felts(&SyscallExecutionError::from(err).to_string())
+                })?;
+            let error = stark_felt_to_native_felt(error);
+
+            Err(vec![error])
+        } else {
+            let ec_point = if x.is_zero() && y.is_zero() {
+                Affine::<Curve>::identity()
+            } else {
+                Affine::<Curve>::new_unchecked(x.into(), y.into())
+            };
+
+            if ec_point.is_on_curve() && ec_point.is_in_correct_subgroup_assuming_on_curve() {
+                Ok(Some(ec_point.into()))
+            } else {
+                Ok(None)
             }
-            Err(SyscallExecutionError::SyscallError { error_data }) => {
-                Err(error_data.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect())
-            }
-            Err(error) => Err(encode_str_as_felts(&error.to_string())),
         }
     }
 
