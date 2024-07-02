@@ -9,8 +9,7 @@ use cairo_native::starknet::{
     SyscallResult, TxInfo, TxV2Info, U256,
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
-use num_traits::ToPrimitive;
-use num_traits::Zero;
+use num_traits::{ToPrimitive, Zero};
 use starknet_api::core::{
     calculate_contract_address, ClassHash, ContractAddress, EntryPointSelector, EthAddress,
     PatriciaKey,
@@ -592,7 +591,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256k1Point>> {
-        Secp256Point::secp256_new(x, y).map(|op| op.map(|p| p.into()))
+        Secp256Point::new(x, y).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256k1_add(
@@ -601,7 +600,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p1: Secp256k1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        Secp256Point::add(p0.into(), p1.into()).map(|p| p.into())
+        Ok(Secp256Point::add(p0.into(), p1.into()).into())
     }
 
     fn secp256k1_mul(
@@ -610,7 +609,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        Secp256Point::mul(p.into(), m).map(|p| p.into())
+        Ok(Secp256Point::mul(p.into(), m).into())
     }
 
     fn secp256k1_get_point_from_x(
@@ -636,7 +635,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256r1Point>> {
-        Secp256Point::secp256_new(x, y).map(|op| op.map(|p| p.into()))
+        Secp256Point::new(x, y).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256r1_add(
@@ -645,7 +644,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p1: Secp256r1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        Secp256Point::add(p0.into(), p1.into()).map(|p| p.into())
+        Ok(Secp256Point::add(p0.into(), p1.into()).into())
     }
 
     fn secp256r1_mul(
@@ -654,7 +653,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        Secp256Point::mul(p.into(), m).map(|p| p.into())
+        Ok(Secp256Point::mul(p.into(), m).into())
     }
 
     fn secp256r1_get_point_from_x(
@@ -677,8 +676,6 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
 
 use ark_ff::PrimeField;
 
-// Remove impl
-// Replace by mod to get a namespace?
 impl<Curve: SWCurveConfig> Secp256Point<Curve>
 where
     // It's not possible to directly constrain on
@@ -688,7 +685,7 @@ where
     Curve::BaseField: PrimeField, // constraint for get_point_by_id
     ark_ff::BigInt<4>: From<<Curve>::BaseField>, // constraint for point to bigint
 {
-    fn secp256_new(x: U256, y: U256) -> Result<Option<Self>, Vec<Felt>> {
+    fn new(x: U256, y: U256) -> Result<Option<Self>, Vec<Felt>> {
         let x = u256_to_biguint(x);
         let y = u256_to_biguint(y);
         let modulos = Curve::BaseField::MODULUS.into();
@@ -704,23 +701,22 @@ where
             return Err(vec![error]);
         }
 
-        // Maybe re-inline this again because it also checks for modulus
         Ok(maybe_affine(x.into(), y.into()).map(|p| p.into()))
     }
 
-    fn add(p0: Secp256Point<Curve>, p1: Secp256Point<Curve>) -> Result<Self, Vec<Felt>> {
+    fn add(p0: Secp256Point<Curve>, p1: Secp256Point<Curve>) -> Self {
         let lhs: Affine<Curve> = p0.into();
         let rhs: Affine<Curve> = p1.into();
         let result: Projective<Curve> = lhs + rhs;
         let result: Affine<Curve> = result.into();
-        Ok(result.into())
+        result.into()
     }
 
-    fn mul(p: Secp256Point<Curve>, m: U256) -> Result<Self, Vec<Felt>> {
+    fn mul(p: Secp256Point<Curve>, m: U256) -> Self {
         let p: Affine<Curve> = p.into();
         let result = p * Curve::ScalarField::from(u256_to_biguint(m));
         let result: Affine<Curve> = result.into();
-        Ok(result.into())
+        result.into()
     }
 
     fn get_point_from_x(x: U256, y_parity: bool) -> Result<Option<Self>, Vec<Felt>> {
@@ -755,7 +751,7 @@ where
     }
 }
 
-/// Similar to Affine<Curve>::new, but with checks for 0 and non-panickly
+/// Similar to Affine<Curve>::new, but with checks for 0 and doesn't panic.
 fn maybe_affine<Curve: SWCurveConfig>(
     x: Curve::BaseField,
     y: Curve::BaseField,
@@ -784,14 +780,6 @@ struct Secp256Point<Config> {
     _phantom: PhantomData<Config>,
 }
 
-// Acts as an adapter
-impl<Curve> Secp256Point<Curve> {
-    // Make this new unchecked and pull the others in
-    fn new(x: U256, y: U256) -> Self {
-        Secp256Point { x, y, _phantom: Default::default() }
-    }
-}
-
 use std::convert::From;
 
 impl From<Secp256Point<ark_secp256k1::Config>> for Secp256k1Point {
@@ -808,13 +796,13 @@ impl From<Secp256Point<ark_secp256r1::Config>> for Secp256r1Point {
 
 impl From<Secp256k1Point> for Secp256Point<ark_secp256k1::Config> {
     fn from(p: Secp256k1Point) -> Self {
-        Secp256Point::new(p.x, p.y)
+        Self { x: p.x, y: p.y, _phantom: Default::default() }
     }
 }
 
 impl From<Secp256r1Point> for Secp256Point<ark_secp256r1::Config> {
     fn from(p: Secp256r1Point) -> Self {
-        Secp256Point::new(p.x, p.y)
+        Self { x: p.x, y: p.y, _phantom: Default::default() }
     }
 }
 
@@ -835,7 +823,7 @@ where
         // A workaround for turning big4int into a u256 that matches the way the
         // result of native and VM are displayed.
         // Having to swap around is most-likely a bug, but best investigated after
-        // this issue (TODO(xrvdg) Github link)
+        // https://github.com/NethermindEth/blockifier/issues/97
         fn swap(x: U256) -> U256 {
             U256 { hi: x.lo, lo: x.hi }
         }
@@ -845,6 +833,6 @@ where
         let x = big4int_to_u256(point.x.into());
         let y = big4int_to_u256(point.y.into());
 
-        Secp256Point::new(swap(x), swap(y))
+        Self { x: swap(x), y: swap(y), _phantom: Default::default() }
     }
 }
