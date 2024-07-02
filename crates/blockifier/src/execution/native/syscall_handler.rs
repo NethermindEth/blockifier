@@ -41,7 +41,6 @@ use crate::execution::syscalls::exceeds_event_size_limit;
 use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
 };
-use crate::execution::syscalls::secp::SecpHintProcessor;
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
 pub struct NativeSyscallHandler<'state> {
@@ -62,10 +61,6 @@ pub struct NativeSyscallHandler<'state> {
     // Additional execution result info
     pub storage_read_values: Vec<StarkFelt>,
     pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
-
-    // Secp hint processors.
-    pub secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
-    pub secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
 }
 
 impl<'state> NativeSyscallHandler<'_> {
@@ -87,8 +82,6 @@ impl<'state> NativeSyscallHandler<'_> {
             events: Vec::new(),
             l2_to_l1_messages: Vec::new(),
             inner_calls: Vec::new(),
-            secp256k1_hint_processor: Default::default(),
-            secp256r1_hint_processor: Default::default(),
             storage_read_values: Vec::new(),
             accessed_storage_keys: HashSet::new(),
         }
@@ -599,7 +592,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256k1Point>> {
-        self.secp256k1_hint_processor.secp256_new(x, y).map(|op| op.map(|p| p.into()))
+        Secp256Point::secp256_new(x, y).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256k1_add(
@@ -608,7 +601,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p1: Secp256k1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        self.secp256k1_hint_processor.add(p0.into(), p1.into()).map(|p| p.into())
+        Secp256Point::add(p0.into(), p1.into()).map(|p| p.into())
     }
 
     fn secp256k1_mul(
@@ -617,7 +610,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
-        self.secp256k1_hint_processor.mul(p.into(), m).map(|p| p.into())
+        Secp256Point::mul(p.into(), m).map(|p| p.into())
     }
 
     fn secp256k1_get_point_from_x(
@@ -626,7 +619,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y_parity: bool,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256k1Point>> {
-        self.secp256k1_hint_processor.get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
+        Secp256Point::get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256k1_get_xy(
@@ -643,7 +636,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256r1Point>> {
-        self.secp256r1_hint_processor.secp256_new(x, y).map(|op| op.map(|p| p.into()))
+        Secp256Point::secp256_new(x, y).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256r1_add(
@@ -652,7 +645,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p1: Secp256r1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        self.secp256r1_hint_processor.add(p0.into(), p1.into()).map(|p| p.into())
+        Secp256Point::add(p0.into(), p1.into()).map(|p| p.into())
     }
 
     fn secp256r1_mul(
@@ -661,7 +654,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         m: U256,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
-        self.secp256r1_hint_processor.mul(p.into(), m).map(|p| p.into())
+        Secp256Point::mul(p.into(), m).map(|p| p.into())
     }
 
     fn secp256r1_get_point_from_x(
@@ -670,7 +663,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         y_parity: bool,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256r1Point>> {
-        self.secp256r1_hint_processor.get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
+        Secp256Point::get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256r1_get_xy(
@@ -684,7 +677,9 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
 
 use ark_ff::PrimeField;
 
-impl<Curve: SWCurveConfig> SecpHintProcessor<Curve>
+// Remove impl
+// Replace by mod to get a namespace?
+impl<Curve: SWCurveConfig> Secp256Point<Curve>
 where
     // It's not possible to directly constrain on
     // ark_secp256k1::Config and
@@ -693,7 +688,7 @@ where
     Curve::BaseField: PrimeField, // constraint for get_point_by_id
     ark_ff::BigInt<4>: From<<Curve>::BaseField>, // constraint for point to bigint
 {
-    fn secp256_new(&mut self, x: U256, y: U256) -> Result<Option<Secp256Point<Curve>>, Vec<Felt>> {
+    fn secp256_new(x: U256, y: U256) -> Result<Option<Self>, Vec<Felt>> {
         let x = u256_to_biguint(x);
         let y = u256_to_biguint(y);
         let modulos = Curve::BaseField::MODULUS.into();
@@ -713,11 +708,7 @@ where
         Ok(maybe_affine(x.into(), y.into()).map(|p| p.into()))
     }
 
-    fn add(
-        &mut self,
-        p0: Secp256Point<Curve>,
-        p1: Secp256Point<Curve>,
-    ) -> Result<Secp256Point<Curve>, Vec<Felt>> {
+    fn add(p0: Secp256Point<Curve>, p1: Secp256Point<Curve>) -> Result<Self, Vec<Felt>> {
         let lhs: Affine<Curve> = p0.into();
         let rhs: Affine<Curve> = p1.into();
         let result: Projective<Curve> = lhs + rhs;
@@ -725,18 +716,14 @@ where
         Ok(result.into())
     }
 
-    fn mul(&mut self, p: Secp256Point<Curve>, m: U256) -> Result<Secp256Point<Curve>, Vec<Felt>> {
+    fn mul(p: Secp256Point<Curve>, m: U256) -> Result<Self, Vec<Felt>> {
         let p: Affine<Curve> = p.into();
         let result = p * Curve::ScalarField::from(u256_to_biguint(m));
         let result: Affine<Curve> = result.into();
         Ok(result.into())
     }
 
-    fn get_point_from_x(
-        &mut self,
-        x: U256,
-        y_parity: bool,
-    ) -> Result<Option<Secp256Point<Curve>>, Vec<Felt>> {
+    fn get_point_from_x(x: U256, y_parity: bool) -> Result<Option<Self>, Vec<Felt>> {
         let modulos = Curve::BaseField::MODULUS.into();
         let x = u256_to_biguint(x);
 
@@ -788,7 +775,7 @@ fn maybe_affine<Curve: SWCurveConfig>(
 }
 
 /// Note [Hint processor and Secp256Point]
-/// With this data structure and it's From instances we
+/// With this data structure and its From instances we
 /// tie a hint processor to the corresponding Secp256k1 or Secp256r1 point.
 /// Thereby making the hint processor operations generic over the Secp256 point.
 struct Secp256Point<Config> {
@@ -797,7 +784,9 @@ struct Secp256Point<Config> {
     _phantom: PhantomData<Config>,
 }
 
+// Acts as an adapter
 impl<Curve> Secp256Point<Curve> {
+    // Make this new unchecked and pull the others in
     fn new(x: U256, y: U256) -> Self {
         Secp256Point { x, y, _phantom: Default::default() }
     }
