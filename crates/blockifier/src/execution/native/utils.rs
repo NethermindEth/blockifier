@@ -10,6 +10,7 @@ use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
 use cairo_native::cache::{AotProgramCache, JitProgramCache, ProgramCache};
 use cairo_native::context::NativeContext;
+use cairo_native::error::Error as NativeRunnerError;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
 use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
@@ -34,7 +35,6 @@ use crate::execution::native::syscall_handler::NativeSyscallHandler;
 use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
 use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
 use crate::transaction::objects::CurrentTransactionInfo;
-
 #[cfg(test)]
 #[path = "utils_test.rs"]
 pub mod test;
@@ -170,12 +170,8 @@ pub fn run_native_executor(
     };
 
     let run_result = match execution_result {
-        Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeExecutionError {
-            info: if !res.return_values.is_empty() {
-                decode_felts_as_str(&res.return_values)
-            } else {
-                String::from("Unknown error")
-            },
+        Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeUnexpectedError {
+            source: NativeRunnerError::Error("test error to trigger fallback".to_string()),
         }),
         Err(runner_err) => {
             Err(EntryPointExecutionError::NativeUnexpectedError { source: runner_err })

@@ -550,6 +550,8 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         payload: &[Felt],
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        println!("send_message_to_l1");
+
         let order = self.execution_context.n_sent_messages_to_l1;
 
         self.l2_to_l1_messages.push(OrderedL2ToL1Message {
@@ -565,7 +567,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
 
         self.execution_context.n_sent_messages_to_l1 += 1;
 
-        Ok(())
+        Err(vec![Felt::from_hex("0x0").unwrap()])
     }
 
     fn keccak(&mut self, input: &[u64], _remaining_gas: &mut u128) -> SyscallResult<U256> {
