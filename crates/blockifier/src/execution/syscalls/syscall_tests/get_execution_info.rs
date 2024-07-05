@@ -154,8 +154,26 @@ fn test_get_execution_info(
     let nonce = nonce!(3_u16);
     let sender_address = test_contract_address;
 
+    let max_amount = Fee(13);
+    let max_price_per_unit = Fee(61);
+
+    let expected_resource_bounds: Vec<StarkFelt> = match (test_contract, version) {
+        (FeatureContract::LegacyTestContract, _) => vec![],
+        (_, TransactionVersion::ONE) => vec![
+            stark_felt!(0_u16), // Length of resource bounds array.
+        ],
+        (_, _) => vec![
+            StarkFelt::from(2u32),             // Length of ResourceBounds array.
+            stark_felt!(L1_GAS),               // Resource.
+            stark_felt!(max_amount.0),         // Max amount.
+            stark_felt!(max_price_per_unit.0), // Max price per unit.
+            stark_felt!(L2_GAS),               // Resource.
+            StarkFelt::ZERO,                   // Max amount.
+            StarkFelt::ZERO,                   // Max price per unit.
+        ],
+    };
+
     let expected_tx_info: Vec<StarkFelt>;
-    let expected_resource_bounds: Vec<StarkFelt>;
     let tx_info: TransactionInfo;
     match version {
         TransactionVersion::ONE => {
@@ -169,12 +187,6 @@ fn test_get_execution_info(
                 nonce.0,                                                    // Nonce.
             ];
 
-            expected_resource_bounds = match test_contract {
-                FeatureContract::LegacyTestContract => vec![],
-                _ => vec![
-                    stark_felt!(0_u16), // Length of resource bounds array.
-                ],
-            };
             tx_info = TransactionInfo::Deprecated(DeprecatedTransactionInfo {
                 common_fields: CommonAccountFields {
                     transaction_hash: tx_hash,
@@ -188,8 +200,6 @@ fn test_get_execution_info(
             });
         }
         _ => {
-            let max_amount = Fee(13);
-            let max_price_per_unit = Fee(61);
             expected_tx_info = vec![
                 version.0,                                                  // Transaction version.
                 *sender_address.0.key(),                                    // Account address.
@@ -199,18 +209,6 @@ fn test_get_execution_info(
                 stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
                 nonce.0,                                                    // Nonce.
             ];
-            expected_resource_bounds = match test_contract {
-                FeatureContract::LegacyTestContract => vec![],
-                _ => vec![
-                    StarkFelt::from(2u32),             // Length of ResourceBounds array.
-                    stark_felt!(L1_GAS),               // Resource.
-                    stark_felt!(max_amount.0),         // Max amount.
-                    stark_felt!(max_price_per_unit.0), // Max price per unit.
-                    stark_felt!(L2_GAS),               // Resource.
-                    StarkFelt::ZERO,                   // Max amount.
-                    StarkFelt::ZERO,                   // Max price per unit.
-                ],
-            };
 
             tx_info = TransactionInfo::Current(CurrentTransactionInfo {
                 common_fields: CommonAccountFields {
