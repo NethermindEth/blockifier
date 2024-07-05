@@ -108,14 +108,7 @@ fn test_get_execution_info(
     mut version: TransactionVersion,
     only_query: bool,
 ) {
-    let is_legacy = test_contract == FeatureContract::LegacyTestContract;
-    let legacy_contract = FeatureContract::LegacyTestContract;
-    let state = &mut test_state(
-        &ChainInfo::create_for_testing(),
-        BALANCE,
-        &[(legacy_contract, 1), (test_contract, 1)],
-    );
-    assert_consistent_contract_version(legacy_contract, state);
+    let state = &mut test_state(&ChainInfo::create_for_testing(), BALANCE, &[(test_contract, 1)]);
     assert_consistent_contract_version(test_contract, state);
     let expected_block_info = match execution_mode {
         ExecutionMode::Validate => [
@@ -132,20 +125,22 @@ fn test_get_execution_info(
         ],
     };
 
-    let (test_contract_address, expected_unsupported_fields) = if is_legacy {
-        verify_compiler_version(legacy_contract, "2.1.0");
-        (legacy_contract.get_instance_address(0), vec![])
-    } else {
-        (
-            test_contract.get_instance_address(0),
+    let test_contract_address = test_contract.get_instance_address(0);
+
+    let expected_unsupported_fields = match test_contract {
+        FeatureContract::LegacyTestContract => {
+            verify_compiler_version(test_contract, "2.1.0");
+            vec![]
+        }
+        _ => {
             vec![
                 StarkFelt::ZERO, // Tip.
                 StarkFelt::ZERO, // Paymaster data.
                 StarkFelt::ZERO, // Nonce DA.
                 StarkFelt::ZERO, // Fee DA.
                 StarkFelt::ZERO, // Account data.
-            ],
-        )
+            ]
+        }
     };
 
     if only_query {
@@ -160,7 +155,7 @@ fn test_get_execution_info(
     let sender_address = test_contract_address;
 
     let expected_tx_info: Vec<StarkFelt>;
-    let mut expected_resource_bounds: Vec<StarkFelt> = vec![];
+    let expected_resource_bounds: Vec<StarkFelt>;
     let tx_info: TransactionInfo;
     match version {
         TransactionVersion::ONE => {
@@ -173,11 +168,13 @@ fn test_get_execution_info(
                 stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
                 nonce.0,                                                    // Nonce.
             ];
-            if !is_legacy {
-                expected_resource_bounds = vec![
+
+            expected_resource_bounds = match test_contract {
+                FeatureContract::LegacyTestContract => vec![],
+                _ => vec![
                     stark_felt!(0_u16), // Length of resource bounds array.
-                ];
-            }
+                ],
+            };
             tx_info = TransactionInfo::Deprecated(DeprecatedTransactionInfo {
                 common_fields: CommonAccountFields {
                     transaction_hash: tx_hash,
@@ -202,8 +199,9 @@ fn test_get_execution_info(
                 stark_felt!(&*ChainId(CHAIN_ID_NAME.to_string()).as_hex()), // Chain ID.
                 nonce.0,                                                    // Nonce.
             ];
-            if !is_legacy {
-                expected_resource_bounds = vec![
+            expected_resource_bounds = match test_contract {
+                FeatureContract::LegacyTestContract => vec![],
+                _ => vec![
                     StarkFelt::from(2u32),             // Length of ResourceBounds array.
                     stark_felt!(L1_GAS),               // Resource.
                     stark_felt!(max_amount.0),         // Max amount.
@@ -211,8 +209,9 @@ fn test_get_execution_info(
                     stark_felt!(L2_GAS),               // Resource.
                     StarkFelt::ZERO,                   // Max amount.
                     StarkFelt::ZERO,                   // Max price per unit.
-                ];
-            }
+                ],
+            };
+
             tx_info = TransactionInfo::Current(CurrentTransactionInfo {
                 common_fields: CommonAccountFields {
                     transaction_hash: tx_hash,
@@ -279,6 +278,5 @@ fn test_get_execution_info(
     };
 
     assert!(!result.unwrap().execution.failed);
-    assert_consistent_contract_version(legacy_contract, state);
     assert_consistent_contract_version(test_contract, state);
 }
