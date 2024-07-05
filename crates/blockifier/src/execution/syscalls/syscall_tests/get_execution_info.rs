@@ -222,8 +222,8 @@ fn test_get_execution_info(
                 resource_bounds: ResourceBoundsMapping(BTreeMap::from([
                     (
                         Resource::L1Gas,
-                        // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the
-                        // convertion works.
+                        // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why
+                        // the convertion works.
                         ResourceBounds {
                             max_amount: max_amount
                                 .0
