@@ -769,7 +769,7 @@ pub fn execute_inner_call(
     remaining_gas: &mut u64,
 ) -> SyscallResult<ReadOnlySegment> {
     let call_info =
-        call.execute(syscall_handler.state, syscall_handler.resources, syscall_handler.context)?;
+        call.execute(syscall_handler.state, syscall_handler.resources, syscall_handler.context, None)?;
     let raw_retdata = &call_info.execution.retdata.0;
 
     if call_info.execution.failed {
