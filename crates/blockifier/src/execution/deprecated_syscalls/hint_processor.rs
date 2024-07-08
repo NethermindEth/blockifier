@@ -475,7 +475,7 @@ pub fn execute_inner_call(
     syscall_handler: &mut DeprecatedSyscallHintProcessor<'_>,
 ) -> DeprecatedSyscallResult<ReadOnlySegment> {
     let call_info =
-        call.execute(syscall_handler.state, syscall_handler.resources, syscall_handler.context)?;
+        call.execute(syscall_handler.state, syscall_handler.resources, syscall_handler.context, None)?;
     let retdata = &call_info.execution.retdata.0;
     let retdata: Vec<MaybeRelocatable> =
         retdata.iter().map(|&x| MaybeRelocatable::from(stark_felt_to_felt(x))).collect();

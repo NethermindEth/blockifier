@@ -2,12 +2,13 @@ use std::time::SystemTime;
 
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
+use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use starknet_api::core::ClassHash;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::{
-    get_native_aot_program_cache, get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor
+    get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor
 };
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::SierraContractClassV1;
@@ -23,6 +24,7 @@ pub fn execute_entry_point_call(
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
+    program_cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     println!("Starting execute_entry_point_call in native blockifier for class hash {}", call.class_hash.clone().unwrap());
     let call_clone = call.clone();
@@ -39,7 +41,6 @@ pub fn execute_entry_point_call(
         }
         Err(e) => println!("Error timing {e}"),
     }
-    let program_cache = get_native_aot_program_cache();
     match now.elapsed() {
         Ok(elapsed) => {
             println!("Got/created cache at {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
@@ -54,14 +55,29 @@ pub fn execute_entry_point_call(
 
     let native_executor = get_native_executor(code_class_hash, sierra_program, program_cache);
 
-    let syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
+    match now.elapsed() {
+        Ok(elapsed) => {
+            println!("Got executor after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+        }
+        Err(e) => println!("Error timing {e}"),
+    }
+
+    let syscall_handler: NativeSyscallHandler<'_, '_> = NativeSyscallHandler::new(
         state,
         call.caller_address,
         call.storage_address,
         call.entry_point_selector,
         resources,
         context,
+        program_cache
     );
+
+    match now.elapsed() {
+        Ok(elapsed) => {
+            println!("Got syscall handler after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+        }
+        Err(e) => println!("Error timing {e}"),
+    }
 
     let sierra_entry_function_id =
         get_sierra_entry_function_id(matching_entrypoint, sierra_program);

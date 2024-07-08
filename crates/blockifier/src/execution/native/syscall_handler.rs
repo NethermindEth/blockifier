@@ -3,6 +3,7 @@ use std::hash::RandomState;
 use std::sync::Arc;
 
 use cairo_felt::Felt252;
+use cairo_native::cache::ProgramCache;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
     SyscallResult, TxInfo, TxV2Info, U256,
@@ -45,7 +46,7 @@ use crate::execution::syscalls::secp::{
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
-pub struct NativeSyscallHandler<'state> {
+pub struct NativeSyscallHandler<'state, 'native> {
     // Input for execution
     pub state: &'state mut dyn State,
     pub execution_resources: &'state mut ExecutionResources,
@@ -67,9 +68,11 @@ pub struct NativeSyscallHandler<'state> {
     // Secp hint processors.
     pub secp256k1_hint_processor: SecpHintProcessor<ark_secp256k1::Config>,
     pub secp256r1_hint_processor: SecpHintProcessor<ark_secp256r1::Config>,
+
+    pub program_cache: &'state mut ProgramCache<'native, ClassHash>,
 }
 
-impl<'state> NativeSyscallHandler<'_> {
+impl<'state, 'native> NativeSyscallHandler<'state, 'native> {
     pub fn new(
         state: &'state mut dyn State,
         caller_address: ContractAddress,
@@ -77,7 +80,8 @@ impl<'state> NativeSyscallHandler<'_> {
         entry_point_selector: EntryPointSelector,
         execution_resources: &'state mut ExecutionResources,
         execution_context: &'state mut EntryPointExecutionContext,
-    ) -> NativeSyscallHandler<'state> {
+        program_cache: &'state mut ProgramCache<'native, ClassHash>,
+    ) -> NativeSyscallHandler<'state, 'native> {
         println!("Creating new native syscall handler with:");
         println!("Caller address: {}", caller_address.to_string());
         println!("Contract address: {}", contract_address.to_string());
@@ -95,11 +99,12 @@ impl<'state> NativeSyscallHandler<'_> {
             secp256r1_hint_processor: Default::default(),
             storage_read_values: Vec::new(),
             accessed_storage_keys: HashSet::new(),
+            program_cache,
         }
     }
 }
 
-impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
+impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'state, 'native> {
     fn get_block_hash(
         &mut self,
         block_number: u64,
@@ -336,6 +341,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             ctor_context,
             wrapper_calldata,
             u64::try_from(*remaining_gas).unwrap(),
+            Some(self.program_cache),
         )
         .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
@@ -407,7 +413,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -467,7 +473,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -846,57 +852,5 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     ) -> SyscallResult<(U256, U256)> {
         println!("Running native syscall integration: secp256r1_get_xy");
         Ok((p.x, p.y))
-    }
-
-    fn pop_log(&mut self) {
-        todo!("Native syscall handler - pop_log") // unimplemented in cairo native
-    }
-
-    fn set_account_contract_address(&mut self, _contract_address: Felt) {
-        todo!("Native syscall handler - set_account_contract_address") // unimplemented in cairo native
-    }
-
-    fn set_block_number(&mut self, _block_number: u64) {
-        todo!("Native syscall handler - set_block_number") // unimplemented in cairo native
-    }
-
-    fn set_block_timestamp(&mut self, _block_timestamp: u64) {
-        todo!("Native syscall handler - set_block_timestamp") // unimplemented in cairo native
-    }
-
-    fn set_caller_address(&mut self, _address: Felt) {
-        todo!("Native syscall handler - set_caller_address") // unimplemented in cairo native
-    }
-
-    fn set_chain_id(&mut self, _chain_id: Felt) {
-        todo!("Native syscall handler - set_chain_id") // unimplemented in cairo native
-    }
-
-    fn set_contract_address(&mut self, _address: Felt) {
-        todo!("Native syscall handler - set_contract_address") // unimplemented in cairo native
-    }
-
-    fn set_max_fee(&mut self, _max_fee: u128) {
-        todo!("Native syscall handler - set_max_fee") // unimplemented in cairo native
-    }
-
-    fn set_nonce(&mut self, _nonce: Felt) {
-        todo!("Native syscall handler - set_nonce") // unimplemented in cairo native
-    }
-
-    fn set_sequencer_address(&mut self, _address: Felt) {
-        todo!("Native syscall handler - set_sequencer_address") // unimplemented in cairo native
-    }
-
-    fn set_signature(&mut self, _signature: &[Felt]) {
-        todo!("Native syscall handler - set_signature") // unimplemented in cairo native
-    }
-
-    fn set_transaction_hash(&mut self, _transaction_hash: Felt) {
-        todo!("Native syscall handler - set_transaction_hash") // unimplemented in cairo native
-    }
-
-    fn set_version(&mut self, _version: Felt) {
-        todo!("Native syscall handler - set_version") // unimplemented in cairo native
     }
 }
