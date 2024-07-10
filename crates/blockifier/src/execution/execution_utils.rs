@@ -53,13 +53,13 @@ pub fn felt_to_stark_felt(felt: &Felt252) -> StarkFelt {
 }
 
 /// Executes a specific call to a contract entry point and returns its output.
-pub fn execute_entry_point_call(
+pub fn execute_entry_point_call<'cache, 'context>(
     call: CallEntryPoint,
     contract_class: ContractClass,
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
-    program_cache: &mut ProgramCache<'_, ClassHash>,
+    program_cache: &'cache mut ProgramCache<'context, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     match contract_class {
         ContractClass::V0(contract_class) => {
@@ -70,6 +70,7 @@ pub fn execute_entry_point_call(
                 state,
                 resources,
                 context,
+                program_cache,
             )
         }
         ContractClass::V1(contract_class) => {
