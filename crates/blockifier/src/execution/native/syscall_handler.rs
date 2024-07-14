@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
-use cairo_felt::Felt252;
 use cairo_native::cache::ProgramCache;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
