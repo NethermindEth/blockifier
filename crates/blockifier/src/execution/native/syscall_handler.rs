@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
+use cairo_native::cache::ProgramCache;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
     SyscallResult, TxInfo, TxV2Info, U256,
@@ -42,7 +43,7 @@ use crate::execution::syscalls::hint_processor::{
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
-pub struct NativeSyscallHandler<'state> {
+pub struct NativeSyscallHandler<'state, 'native> {
     // Input for execution
     pub state: &'state mut dyn State,
     pub execution_resources: &'state mut ExecutionResources,
@@ -60,9 +61,11 @@ pub struct NativeSyscallHandler<'state> {
     // Additional execution result info
     pub storage_read_values: Vec<StarkFelt>,
     pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
+
+    pub program_cache: &'state mut ProgramCache<'native, ClassHash>,
 }
 
-impl<'state> NativeSyscallHandler<'_> {
+impl<'state, 'native> NativeSyscallHandler<'state, 'native> {
     pub fn new(
         state: &'state mut dyn State,
         caller_address: ContractAddress,
@@ -70,7 +73,11 @@ impl<'state> NativeSyscallHandler<'_> {
         entry_point_selector: EntryPointSelector,
         execution_resources: &'state mut ExecutionResources,
         execution_context: &'state mut EntryPointExecutionContext,
-    ) -> NativeSyscallHandler<'state> {
+        program_cache: &'state mut ProgramCache<'native, ClassHash>,
+    ) -> NativeSyscallHandler<'state, 'native> {
+        println!("Creating new native syscall handler with:");
+        println!("Caller address: {}", caller_address.to_string());
+        println!("Contract address: {}", contract_address.to_string());
         NativeSyscallHandler {
             state,
             caller_address,
@@ -83,16 +90,18 @@ impl<'state> NativeSyscallHandler<'_> {
             inner_calls: Vec::new(),
             storage_read_values: Vec::new(),
             accessed_storage_keys: HashSet::new(),
+            program_cache,
         }
     }
 }
 
-impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
+impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'state, 'native> {
     fn get_block_hash(
         &mut self,
         block_number: u64,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
+        println!("Running native syscall integration: get_block_hash");
         if self.execution_context.execution_mode == ExecutionMode::Validate {
             let err = SyscallExecutionError::InvalidSyscallInExecutionMode {
                 syscall_name: "get_block_hash".to_string(),
@@ -132,6 +141,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<cairo_native::starknet::ExecutionInfo> {
+        println!("Running native syscall integration: get_execution_info");
         let block_info = &self.execution_context.tx_context.block_context.block_info;
         let native_block_info: BlockInfo = if self.execution_context.execution_mode
             == ExecutionMode::Validate
@@ -193,6 +203,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<ExecutionInfoV2> {
+        println!("Running native syscall integration: get_execution_info_v2");
         // Get Block Info
         let block_info = &self.execution_context.tx_context.block_context.block_info;
         let native_block_info: BlockInfo = if self.execution_context.execution_mode
@@ -286,6 +297,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         deploy_from_zero: bool,
         remaining_gas: &mut u128,
     ) -> SyscallResult<(Felt, Vec<Felt>)> {
+        println!("Running native syscall integration: deploy");
         let deployer_address =
             if deploy_from_zero { ContractAddress::default() } else { self.contract_address };
 
@@ -320,6 +332,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             ctor_context,
             wrapper_calldata,
             u64::try_from(*remaining_gas).unwrap(),
+            Some(self.program_cache),
         )
         .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
@@ -337,6 +350,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     }
 
     fn replace_class(&mut self, class_hash: Felt, _remaining_gas: &mut u128) -> SyscallResult<()> {
+        println!("Running native syscall integration: replace_class");
         let class_hash = ClassHash(StarkHash::from(native_felt_to_stark_felt(class_hash)));
         let contract_class = self
             .state
@@ -364,6 +378,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         calldata: &[Felt],
         remaining_gas: &mut u128,
     ) -> SyscallResult<Vec<Felt>> {
+        println!("Running native syscall integration: library_call");
         let class_hash = ClassHash(StarkHash::from(native_felt_to_stark_felt(class_hash)));
 
         let wrapper_calldata = Calldata(Arc::new(
@@ -389,7 +404,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -412,6 +427,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         calldata: &[Felt],
         remaining_gas: &mut u128,
     ) -> SyscallResult<Vec<Felt>> {
+        println!("Running native syscall integration: call_contract");
         let contract_address = ContractAddress::try_from(native_felt_to_stark_felt(address))
             .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
@@ -448,7 +464,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -470,6 +486,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         address: Felt,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
+        println!("Running native syscall integration: storage_read");
         let key = StorageKey(
             PatriciaKey::try_from(native_felt_to_stark_felt(address))
                 .map_err(|e| encode_str_as_felts(&e.to_string()))?,
@@ -491,6 +508,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         value: Felt,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        println!("Running native syscall integration: storage_write");
         let key = StorageKey(
             PatriciaKey::try_from(native_felt_to_stark_felt(address))
                 .map_err(|e| encode_str_as_felts(&e.to_string()))?,
@@ -510,6 +528,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         data: &[Felt],
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        println!("Running native syscall integration: emit_event");
         let order = self.execution_context.n_emitted_events;
         let event = EventContent {
             keys: keys
@@ -539,6 +558,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         payload: &[Felt],
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        println!("Running native syscall integration: send_message_to_l1");
         let order = self.execution_context.n_sent_messages_to_l1;
 
         self.l2_to_l1_messages.push(OrderedL2ToL1Message {
@@ -558,6 +578,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     }
 
     fn keccak(&mut self, input: &[u64], _remaining_gas: &mut u128) -> SyscallResult<U256> {
+        println!("Running native syscall integration: keccak");
         const CHUNK_SIZE: usize = 17;
         let length = input.len();
 
@@ -626,6 +647,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p: Secp256k1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<(U256, U256)> {
+        println!("Running native syscall integration: secp256k1_get_xy");
         Ok((p.x, p.y))
     }
 
@@ -670,6 +692,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         p: Secp256r1Point,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<(U256, U256)> {
+        println!("Running native syscall integration: secp256r1_get_xy");
         Ok((p.x, p.y))
     }
 }

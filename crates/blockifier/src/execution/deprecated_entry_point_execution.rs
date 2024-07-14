@@ -1,8 +1,9 @@
+use cairo_native::cache::ProgramCache;
 use cairo_vm::types::relocatable::{MaybeRelocatable, Relocatable};
 use cairo_vm::vm::errors::vm_errors::VirtualMachineError;
 use cairo_vm::vm::runners::cairo_runner::{CairoArg, CairoRunner, ExecutionResources};
 use cairo_vm::vm::vm_core::VirtualMachine;
-use starknet_api::core::EntryPointSelector;
+use starknet_api::core::{ClassHash, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkHash;
 
@@ -20,21 +21,22 @@ use crate::execution::execution_utils::{
 };
 use crate::state::state_api::State;
 
-pub struct VmExecutionContext<'a> {
+pub struct VmExecutionContext<'a, 'context> {
     pub runner: CairoRunner,
     pub vm: VirtualMachine,
-    pub syscall_handler: DeprecatedSyscallHintProcessor<'a>,
+    pub syscall_handler: DeprecatedSyscallHintProcessor<'a, 'context>,
     pub initial_syscall_ptr: Relocatable,
     pub entry_point_pc: usize,
 }
 
 /// Executes a specific call to a contract entry point and returns its output.
-pub fn execute_entry_point_call(
+pub fn execute_entry_point_call<'context>(
     call: CallEntryPoint,
     contract_class: ContractClassV0,
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
+    cache: &mut ProgramCache<'context, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let VmExecutionContext {
         mut runner,
@@ -42,7 +44,7 @@ pub fn execute_entry_point_call(
         mut syscall_handler,
         initial_syscall_ptr,
         entry_point_pc,
-    } = initialize_execution_context(&call, contract_class, state, resources, context)?;
+    } = initialize_execution_context(&call, contract_class, state, resources, context, cache)?;
 
     let (implicit_args, args) = prepare_call_arguments(
         &call,
@@ -69,13 +71,14 @@ pub fn execute_entry_point_call(
     )?)
 }
 
-pub fn initialize_execution_context<'a>(
+pub fn initialize_execution_context<'a, 'context>(
     call: &CallEntryPoint,
     contract_class: ContractClassV0,
     state: &'a mut dyn State,
     resources: &'a mut ExecutionResources,
     context: &'a mut EntryPointExecutionContext,
-) -> Result<VmExecutionContext<'a>, PreExecutionError> {
+    cache: &'a mut ProgramCache<'context, ClassHash>,
+) -> Result<VmExecutionContext<'a, 'context>, PreExecutionError> {
     // Resolve initial PC from EP indicator.
     let entry_point_pc = resolve_entry_point_pc(call, &contract_class)?;
 
@@ -98,6 +101,7 @@ pub fn initialize_execution_context<'a>(
         initial_syscall_ptr,
         call.storage_address,
         call.caller_address,
+        cache,
     );
 
     Ok(VmExecutionContext { runner, vm, syscall_handler, initial_syscall_ptr, entry_point_pc })
@@ -185,10 +189,10 @@ pub fn prepare_call_arguments(
     Ok((implicit_args, args))
 }
 /// Runs the runner from the given PC.
-pub fn run_entry_point(
+pub fn run_entry_point<'context>(
     vm: &mut VirtualMachine,
     runner: &mut CairoRunner,
-    hint_processor: &mut DeprecatedSyscallHintProcessor<'_>,
+    hint_processor: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
     entry_point_pc: usize,
     args: Args,
 ) -> EntryPointExecutionResult<()> {
@@ -207,10 +211,10 @@ pub fn run_entry_point(
     Ok(result?)
 }
 
-pub fn finalize_execution(
+pub fn finalize_execution<'context>(
     mut vm: VirtualMachine,
     runner: CairoRunner,
-    syscall_handler: DeprecatedSyscallHintProcessor<'_>,
+    syscall_handler: DeprecatedSyscallHintProcessor<'_, 'context>,
     call: CallEntryPoint,
     previous_resources: ExecutionResources,
     implicit_args: Vec<MaybeRelocatable>,
@@ -260,10 +264,10 @@ pub fn finalize_execution(
     })
 }
 
-pub fn validate_run(
+pub fn validate_run<'context>(
     vm: &mut VirtualMachine,
     runner: &CairoRunner,
-    syscall_handler: &DeprecatedSyscallHintProcessor<'_>,
+    syscall_handler: &DeprecatedSyscallHintProcessor<'_, 'context>,
     implicit_args: Vec<MaybeRelocatable>,
     implicit_args_end: Relocatable,
 ) -> Result<(), PostExecutionError> {

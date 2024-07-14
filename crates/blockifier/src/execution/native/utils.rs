@@ -74,6 +74,10 @@ pub fn match_entrypoint(
 static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
     std::sync::OnceLock::new();
 
+// static NATIVE_CACHE: std::sync::Mutex<ProgramCache<'_, ClassHash>> = std::sync::Mutex::new(ProgramCache::Aot(AotProgramCache::new(
+//     NATIVE_CONTEXT.get_or_init(NativeContext::new),
+// )));
+
 pub fn get_native_aot_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
     Rc::new(RefCell::new(ProgramCache::Aot(AotProgramCache::new(
         NATIVE_CONTEXT.get_or_init(NativeContext::new),
@@ -89,16 +93,20 @@ pub fn get_native_jit_program_cache<'context>() -> Rc<RefCell<ProgramCache<'cont
 pub fn get_native_executor<'context>(
     class_hash: ClassHash,
     program: &SierraProgram,
-    program_cache: Rc<RefCell<ProgramCache<'context, ClassHash>>>,
+    program_cache: &mut ProgramCache<'context, ClassHash>,
 ) -> NativeExecutor<'context> {
-    let program_cache = &mut (*program_cache.borrow_mut());
-
     match program_cache {
         ProgramCache::Aot(cache) => {
             let cached_executor = cache.get(&class_hash);
             NativeExecutor::Aot(match cached_executor {
-                Some(executor) => executor,
-                None => cache.compile_and_insert(class_hash, program, OptLevel::Default),
+                Some(executor) => {
+                    println!("Cache hit");
+                    executor
+                }
+                None => {
+                    println!("Cache miss");
+                    cache.compile_and_insert(class_hash, program, OptLevel::Default)
+                }
             })
         }
         ProgramCache::Jit(cache) => {
@@ -146,7 +154,7 @@ pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
     call: CallEntryPoint,
-    mut syscall_handler: NativeSyscallHandler<'_>,
+    mut syscall_handler: NativeSyscallHandler<'_, '_>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let stark_felts_to_native_felts = |data: &[StarkFelt]| -> Vec<Felt> {
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
