@@ -257,6 +257,7 @@ impl AccountTransaction {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn handle_validate_tx(
         &self,
         state: &mut dyn State,

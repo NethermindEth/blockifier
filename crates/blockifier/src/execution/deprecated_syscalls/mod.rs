@@ -180,10 +180,10 @@ impl SyscallRequest for CallContractRequest {
 
 pub type CallContractResponse = SingleSegmentResponse;
 
-pub fn call_contract<'context>(
+pub fn call_contract(
     request: CallContractRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<CallContractResponse> {
     let storage_address = request.contract_address;
     let class_hash = syscall_handler.state.get_class_hash_at(storage_address)?;
@@ -219,10 +219,10 @@ pub fn call_contract<'context>(
 type DelegateCallRequest = CallContractRequest;
 type DelegateCallResponse = CallContractResponse;
 
-pub fn delegate_call<'context>(
+pub fn delegate_call(
     request: DelegateCallRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<DelegateCallResponse> {
     let call_to_external = true;
     let storage_address = request.contract_address;
@@ -242,10 +242,10 @@ pub fn delegate_call<'context>(
 
 // DelegateCallL1Handler syscall.
 
-pub fn delegate_l1_handler<'context>(
+pub fn delegate_l1_handler(
     request: DelegateCallRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<DelegateCallResponse> {
     let call_to_external = false;
     let storage_address = request.contract_address;
@@ -306,10 +306,10 @@ impl SyscallResponse for DeployResponse {
     }
 }
 
-pub fn deploy<'context>(
+pub fn deploy(
     request: DeployRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<DeployResponse> {
     let deployer_address = syscall_handler.storage_address;
     let deployer_address_for_calculation = match request.deploy_from_zero {
@@ -368,10 +368,10 @@ impl SyscallRequest for EmitEventRequest {
 
 type EmitEventResponse = EmptyResponse;
 
-pub fn emit_event<'context>(
+pub fn emit_event(
     request: EmitEventRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<EmitEventResponse> {
     let execution_context = &mut syscall_handler.context;
     exceeds_event_size_limit(
@@ -403,10 +403,10 @@ impl SyscallResponse for GetBlockNumberResponse {
     }
 }
 
-pub fn get_block_number<'context>(
+pub fn get_block_number(
     _request: GetBlockNumberRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetBlockNumberResponse> {
     let versioned_constants = syscall_handler.context.versioned_constants();
     let block_number = syscall_handler.get_block_info().block_number;
@@ -439,10 +439,10 @@ impl SyscallResponse for GetBlockTimestampResponse {
     }
 }
 
-pub fn get_block_timestamp<'context>(
+pub fn get_block_timestamp(
     _request: GetBlockTimestampRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetBlockTimestampResponse> {
     let versioned_constants = syscall_handler.context.versioned_constants();
     let block_timestamp = syscall_handler.get_block_info().block_timestamp;
@@ -463,10 +463,10 @@ pub fn get_block_timestamp<'context>(
 type GetCallerAddressRequest = EmptyRequest;
 type GetCallerAddressResponse = GetContractAddressResponse;
 
-pub fn get_caller_address<'context>(
+pub fn get_caller_address(
     _request: GetCallerAddressRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetCallerAddressResponse> {
     Ok(GetCallerAddressResponse { address: syscall_handler.caller_address })
 }
@@ -487,10 +487,10 @@ impl SyscallResponse for GetContractAddressResponse {
     }
 }
 
-pub fn get_contract_address<'context>(
+pub fn get_contract_address(
     _request: GetContractAddressRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetContractAddressResponse> {
     Ok(GetContractAddressResponse { address: syscall_handler.storage_address })
 }
@@ -500,10 +500,10 @@ pub fn get_contract_address<'context>(
 type GetSequencerAddressRequest = EmptyRequest;
 type GetSequencerAddressResponse = GetContractAddressResponse;
 
-pub fn get_sequencer_address<'context>(
+pub fn get_sequencer_address(
     _request: GetSequencerAddressRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetSequencerAddressResponse> {
     syscall_handler.verify_not_in_validate_mode("get_sequencer_address")?;
     Ok(GetSequencerAddressResponse { address: syscall_handler.get_block_info().sequencer_address })
@@ -524,10 +524,10 @@ impl SyscallResponse for GetTxInfoResponse {
         Ok(())
     }
 }
-pub fn get_tx_info<'context>(
+pub fn get_tx_info(
     _request: GetTxInfoRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetTxInfoResponse> {
     let tx_info_start_ptr = syscall_handler.get_or_allocate_tx_info_start_ptr(vm)?;
 
@@ -539,10 +539,10 @@ pub fn get_tx_info<'context>(
 type GetTxSignatureRequest = EmptyRequest;
 type GetTxSignatureResponse = SingleSegmentResponse;
 
-pub fn get_tx_signature<'context>(
+pub fn get_tx_signature(
     _request: GetTxSignatureRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<GetTxSignatureResponse> {
     let start_ptr = syscall_handler.get_or_allocate_tx_signature_segment(vm)?;
     let length = syscall_handler.context.tx_context.tx_info.signature().0.len();
@@ -573,10 +573,10 @@ impl SyscallRequest for LibraryCallRequest {
 
 type LibraryCallResponse = CallContractResponse;
 
-pub fn library_call<'context>(
+pub fn library_call(
     request: LibraryCallRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<LibraryCallResponse> {
     let call_to_external = true;
     let retdata_segment = execute_library_call(
@@ -594,10 +594,10 @@ pub fn library_call<'context>(
 
 // LibraryCallL1Handler syscall.
 
-pub fn library_call_l1_handler<'context>(
+pub fn library_call_l1_handler(
     request: LibraryCallRequest,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<LibraryCallResponse> {
     let call_to_external = false;
     let retdata_segment = execute_library_call(
@@ -633,10 +633,10 @@ impl SyscallRequest for ReplaceClassRequest {
 
 pub type ReplaceClassResponse = EmptyResponse;
 
-pub fn replace_class<'context>(
+pub fn replace_class(
     request: ReplaceClassRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<ReplaceClassResponse> {
     // Ensure the class is declared (by reading it).
     syscall_handler.state.get_compiled_contract_class(request.class_hash)?;
@@ -667,10 +667,10 @@ impl SyscallRequest for SendMessageToL1Request {
 
 type SendMessageToL1Response = EmptyResponse;
 
-pub fn send_message_to_l1<'context>(
+pub fn send_message_to_l1(
     request: SendMessageToL1Request,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<SendMessageToL1Response> {
     let execution_context = &mut syscall_handler.context;
     let ordered_message_to_l1 = OrderedL2ToL1Message {
@@ -712,10 +712,10 @@ impl SyscallResponse for StorageReadResponse {
     }
 }
 
-pub fn storage_read<'context>(
+pub fn storage_read(
     request: StorageReadRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<StorageReadResponse> {
     syscall_handler.get_contract_storage_at(request.address)
 }
@@ -741,10 +741,10 @@ impl SyscallRequest for StorageWriteRequest {
 
 pub type StorageWriteResponse = EmptyResponse;
 
-pub fn storage_write<'context>(
+pub fn storage_write(
     request: StorageWriteRequest,
     _vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<StorageWriteResponse> {
     syscall_handler.set_contract_storage_at(request.address, request.value)
 }

@@ -146,9 +146,9 @@ impl<S: StateReader> TransactionExecutor<S> {
     ) -> Vec<TransactionExecutorResult<TransactionExecutionInfo>> {
         let mut results_to_return = Vec::new();
         let results = if let Some(cache) = program_cache {
-            txs.into_iter().map(|tx| self.execute(tx, charge_fee, Some(cache))).collect_vec()
+            txs.iter().map(|tx| self.execute(tx, charge_fee, Some(cache))).collect_vec()
         } else {
-            txs.into_iter().map(|tx| self.execute(tx, charge_fee, None)).collect_vec()
+            txs.iter().map(|tx| self.execute(tx, charge_fee, None)).collect_vec()
         };
 
         for result in results {

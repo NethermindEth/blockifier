@@ -67,14 +67,14 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
             None => {
                 let program_cache = get_native_aot_program_cache();
                 let program_cache = &mut (*program_cache.borrow_mut());
-                let result = self.execute_raw(
+                
+                self.execute_raw(
                     &mut transactional_state,
                     block_context,
                     charge_fee,
                     validate,
                     Some(program_cache),
-                );
-                result
+                )
             }
         };
 

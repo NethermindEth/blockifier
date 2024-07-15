@@ -30,13 +30,13 @@ pub struct VmExecutionContext<'a, 'context> {
 }
 
 /// Executes a specific call to a contract entry point and returns its output.
-pub fn execute_entry_point_call<'context>(
+pub fn execute_entry_point_call(
     call: CallEntryPoint,
     contract_class: ContractClassV0,
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
-    cache: &mut ProgramCache<'context, ClassHash>,
+    cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let VmExecutionContext {
         mut runner,
@@ -189,10 +189,10 @@ pub fn prepare_call_arguments(
     Ok((implicit_args, args))
 }
 /// Runs the runner from the given PC.
-pub fn run_entry_point<'context>(
+pub fn run_entry_point(
     vm: &mut VirtualMachine,
     runner: &mut CairoRunner,
-    hint_processor: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    hint_processor: &mut DeprecatedSyscallHintProcessor<'_, '_>,
     entry_point_pc: usize,
     args: Args,
 ) -> EntryPointExecutionResult<()> {
@@ -211,10 +211,10 @@ pub fn run_entry_point<'context>(
     Ok(result?)
 }
 
-pub fn finalize_execution<'context>(
+pub fn finalize_execution(
     mut vm: VirtualMachine,
     runner: CairoRunner,
-    syscall_handler: DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: DeprecatedSyscallHintProcessor<'_, '_>,
     call: CallEntryPoint,
     previous_resources: ExecutionResources,
     implicit_args: Vec<MaybeRelocatable>,
@@ -264,10 +264,10 @@ pub fn finalize_execution<'context>(
     })
 }
 
-pub fn validate_run<'context>(
+pub fn validate_run(
     vm: &mut VirtualMachine,
     runner: &CairoRunner,
-    syscall_handler: &DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &DeprecatedSyscallHintProcessor<'_, '_>,
     implicit_args: Vec<MaybeRelocatable>,
     implicit_args_end: Relocatable,
 ) -> Result<(), PostExecutionError> {

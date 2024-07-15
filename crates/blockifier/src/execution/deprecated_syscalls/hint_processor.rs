@@ -474,10 +474,10 @@ pub fn read_call_params(
     Ok((function_selector, calldata))
 }
 
-pub fn execute_inner_call<'context>(
+pub fn execute_inner_call(
     call: CallEntryPoint,
     vm: &mut VirtualMachine,
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
 ) -> DeprecatedSyscallResult<ReadOnlySegment> {
     let call_info = call.execute(
         syscall_handler.state,
@@ -494,8 +494,8 @@ pub fn execute_inner_call<'context>(
     Ok(ReadOnlySegment { start_ptr: retdata_segment_start_ptr, length: retdata.len() })
 }
 
-pub fn execute_library_call<'context>(
-    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, 'context>,
+pub fn execute_library_call(
+    syscall_handler: &mut DeprecatedSyscallHintProcessor<'_, '_>,
     vm: &mut VirtualMachine,
     class_hash: ClassHash,
     code_address: Option<ContractAddress>,
