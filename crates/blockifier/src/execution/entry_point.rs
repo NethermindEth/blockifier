@@ -115,7 +115,7 @@ impl CallEntryPoint {
                 // execution
                 let program_cache = get_native_aot_program_cache();
                 let program_cache = &mut (*program_cache.borrow_mut());
-                
+
                 execute_entry_point_call(
                     self,
                     contract_class,
