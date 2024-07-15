@@ -11,6 +11,7 @@ use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::transaction::{Calldata, TransactionVersion};
 
+use super::native::utils::get_native_aot_program_cache;
 use crate::abi::abi_utils::selector_from_name;
 use crate::abi::constants;
 use crate::context::{BlockContext, TransactionContext};
@@ -25,8 +26,6 @@ use crate::transaction::objects::{HasRelatedFeeType, TransactionExecutionResult,
 use crate::transaction::transaction_types::TransactionType;
 use crate::utils::{u128_from_usize, usize_from_u128};
 use crate::versioned_constants::{GasCosts, VersionedConstants};
-
-use super::native::utils::get_native_aot_program_cache;
 
 #[cfg(test)]
 #[path = "entry_point_test.rs"]
@@ -103,16 +102,29 @@ impl CallEntryPoint {
         let contract_class = state.get_compiled_contract_class(class_hash)?;
 
         match program_cache {
-            Some(program_cache) => {
-                execute_entry_point_call(self, contract_class, state, resources, context, program_cache)
-            }
+            Some(program_cache) => execute_entry_point_call(
+                self,
+                contract_class,
+                state,
+                resources,
+                context,
+                program_cache,
+            ),
             None => {
-                // If no cache was provided, create a temporary one to last for the duration of this execution
+                // If no cache was provided, create a temporary one to last for the duration of this
+                // execution
                 let program_cache = get_native_aot_program_cache();
                 let program_cache = &mut (*program_cache.borrow_mut());
-                let result = execute_entry_point_call(self, contract_class, state, resources, context, program_cache);
+                let result = execute_entry_point_call(
+                    self,
+                    contract_class,
+                    state,
+                    resources,
+                    context,
+                    program_cache,
+                );
                 result
-            },
+            }
         }
     }
 }

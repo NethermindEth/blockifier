@@ -6,7 +6,7 @@ use starknet_api::core::ClassHash;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::{
-    get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor
+    get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor,
 };
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::SierraContractClassV1;
@@ -44,7 +44,7 @@ pub fn execute_entry_point_call(
         call.entry_point_selector,
         resources,
         context,
-        program_cache
+        program_cache,
     );
 
     let sierra_entry_function_id =

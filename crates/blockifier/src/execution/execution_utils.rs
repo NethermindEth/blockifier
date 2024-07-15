@@ -72,15 +72,13 @@ pub fn execute_entry_point_call<'cache, 'context>(
                 program_cache,
             )
         }
-        ContractClass::V1(contract_class) => {
-            entry_point_execution::execute_entry_point_call(
-                call,
-                contract_class,
-                state,
-                resources,
-                context,
-            )
-        }
+        ContractClass::V1(contract_class) => entry_point_execution::execute_entry_point_call(
+            call,
+            contract_class,
+            state,
+            resources,
+            context,
+        ),
         ContractClass::V1Sierra(contract_class) => {
             let fallback = env::var("FALLBACK_ENABLED").unwrap_or(String::from("0")) == "1";
             match native_entry_point_execution::execute_entry_point_call(
@@ -336,11 +334,7 @@ pub fn format_panic_data(felts: &[StarkFelt]) -> String {
     while let Some(item) = format_next_item(&mut felts) {
         items.push(item.quote_if_string());
     }
-    if let [item] = &items[..] {
-        item.clone()
-    } else {
-        format!("({})", items.join(", "))
-    }
+    if let [item] = &items[..] { item.clone() } else { format!("({})", items.join(", ")) }
 }
 
 /// Returns the VM resources required for running `poseidon_hash_many` in the Starknet OS.

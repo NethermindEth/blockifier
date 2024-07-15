@@ -395,7 +395,12 @@ impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'stat
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -454,7 +459,12 @@ impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'stat
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info

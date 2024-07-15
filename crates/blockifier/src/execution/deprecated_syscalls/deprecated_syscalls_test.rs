@@ -418,7 +418,8 @@ fn test_block_info_syscalls(
 
     if execution_mode == ExecutionMode::Validate {
         if block_info_member_name == "sequencer_address" {
-            let error = entry_point_call.execute_directly_in_validate_mode(&mut state, None).unwrap_err();
+            let error =
+                entry_point_call.execute_directly_in_validate_mode(&mut state, None).unwrap_err();
             check_entry_point_execution_error_for_custom_hint!(
                 &error,
                 &format!(
@@ -428,7 +429,10 @@ fn test_block_info_syscalls(
             );
         } else {
             assert_eq!(
-                entry_point_call.execute_directly_in_validate_mode(&mut state, None).unwrap().execution,
+                entry_point_call
+                    .execute_directly_in_validate_mode(&mut state, None)
+                    .unwrap()
+                    .execution,
                 CallExecution::from_retdata(retdata![])
             );
         }

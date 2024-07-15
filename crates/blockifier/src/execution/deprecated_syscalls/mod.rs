@@ -336,7 +336,7 @@ pub fn deploy<'context>(
         ctor_context,
         request.constructor_calldata,
         syscall_handler.context.gas_costs().initial_gas_cost,
-        None
+        None,
     )?;
     syscall_handler.inner_calls.push(call_info);
 

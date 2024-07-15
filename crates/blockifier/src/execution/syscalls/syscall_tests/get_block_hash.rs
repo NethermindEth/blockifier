@@ -76,8 +76,10 @@ fn negative_flow_execution_mode_validate(test_contract: FeatureContract) {
         ..trivial_external_entry_point_new(test_contract)
     };
 
-    let error =
-        entry_point_call.execute_directly_in_validate_mode(&mut state, None).unwrap_err().to_string();
+    let error = entry_point_call
+        .execute_directly_in_validate_mode(&mut state, None)
+        .unwrap_err()
+        .to_string();
     // check_entry_point_execution_error_for_custom_hint!(
     //     &error,
     //     "Unauthorized syscall get_block_hash in execution mode Validate.",

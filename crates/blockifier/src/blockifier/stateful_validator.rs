@@ -98,7 +98,11 @@ impl<S: StateReader> StatefulValidator<S> {
         Ok(())
     }
 
-    fn execute(&mut self, tx: AccountTransaction, program_cache: Option<&mut ProgramCache<'_, ClassHash>>) -> StatefulValidatorResult<()> {
+    fn execute(
+        &mut self,
+        tx: AccountTransaction,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+    ) -> StatefulValidatorResult<()> {
         self.tx_executor.execute(&Transaction::AccountTransaction(tx), true, program_cache)?;
         Ok(())
     }

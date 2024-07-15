@@ -78,8 +78,13 @@ impl<S: StateReader> TransactionExecutor<S> {
         let mut transactional_state = CachedState::create_transactional(&mut self.state);
         let validate = true;
 
-        let tx_execution_result =
-            tx.execute_raw(&mut transactional_state, &self.block_context, charge_fee, validate, program_cache);
+        let tx_execution_result = tx.execute_raw(
+            &mut transactional_state,
+            &self.block_context,
+            charge_fee,
+            validate,
+            program_cache,
+        );
         match tx_execution_result {
             Ok(tx_execution_info) => {
                 self.bouncer.try_update(
