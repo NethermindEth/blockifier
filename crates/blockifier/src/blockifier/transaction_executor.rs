@@ -16,7 +16,7 @@ use crate::state::errors::StateError;
 use crate::state::state_api::{State, StateReader};
 use crate::transaction::account_transaction::AccountTransaction;
 use crate::transaction::errors::TransactionExecutionError;
-use crate::transaction::objects::TransactionExecutionInfo;
+use crate::transaction::objects::{TransactionExecutionInfo, TransactionInfoCreator};
 use crate::transaction::transaction_execution::Transaction;
 use crate::transaction::transactions::{ExecutableTransaction, ValidatableTransaction};
 
@@ -76,8 +76,13 @@ impl<S: StateReader> TransactionExecutor<S> {
         let mut transactional_state = CachedState::create_transactional(&mut self.state);
         let validate = true;
 
-        let tx_execution_result =
-            tx.execute_raw(&mut transactional_state, &self.block_context, charge_fee, validate);
+        let tx_execution_result = tx.execute_raw(
+            &mut transactional_state,
+            &self.block_context,
+            charge_fee,
+            validate,
+            Some(tx.create_tx_info().transaction_hash()),
+        );
         match tx_execution_result {
             Ok(tx_execution_info) => {
                 self.bouncer.try_update(

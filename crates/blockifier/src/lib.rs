@@ -15,6 +15,7 @@ pub mod bouncer;
 #[cfg(feature = "concurrency")]
 pub mod concurrency;
 pub mod context;
+pub mod debug;
 pub mod execution;
 pub mod fee;
 pub mod state;

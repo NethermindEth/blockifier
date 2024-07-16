@@ -5,11 +5,14 @@ use starknet_api::calldata;
 use starknet_api::core::{ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
-use starknet_api::transaction::{Calldata, Fee, ResourceBounds, TransactionVersion};
+use starknet_api::transaction::{
+    Calldata, Fee, ResourceBounds, TransactionHash, TransactionVersion,
+};
 
 use crate::abi::abi_utils::{get_fee_token_var_address, selector_from_name};
 use crate::abi::sierra_types::next_storage_key;
 use crate::context::{BlockContext, TransactionContext};
+use crate::debug::get_execution_resources;
 use crate::execution::call_info::{CallInfo, Retdata};
 use crate::execution::contract_class::ContractClass;
 use crate::execution::entry_point::{CallEntryPoint, CallType, EntryPointExecutionContext};
@@ -484,6 +487,7 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         charge_fee: bool,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         let mut resources = ExecutionResources::default();
         let mut execution_context =
@@ -531,6 +535,11 @@ impl AccountTransaction {
             validate_call_info.iter(),
             execution_steps_consumed,
         )?;
+
+        if let Some(tx_hash) = tx_hash {
+            let resources = get_execution_resources(tx_hash);
+            execution_resources = resources;
+        }
 
         match execution_result {
             Ok(execute_call_info) => {
@@ -625,12 +634,13 @@ impl AccountTransaction {
         tx_context: Arc<TransactionContext>,
         validate: bool,
         charge_fee: bool,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         if self.is_non_revertible(&tx_context.tx_info) {
             return self.run_non_revertible(state, tx_context, remaining_gas, validate, charge_fee);
         }
 
-        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee)
+        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee, tx_hash)
     }
 }
 
@@ -641,6 +651,7 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
         block_context: &BlockContext,
         charge_fee: bool,
         validate: bool,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
         self.verify_tx_version(tx_context.tx_info.version())?;
@@ -668,7 +679,9 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             tx_context.clone(),
             validate,
             charge_fee,
+            tx_hash,
         )?;
+
         let fee_transfer_call_info = self.handle_fee(state, tx_context, final_fee, charge_fee)?;
 
         let tx_execution_info = TransactionExecutionInfo {

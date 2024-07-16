@@ -5,6 +5,7 @@ use starknet_api::core::{calculate_contract_address, ContractAddress};
 use starknet_api::transaction::{Fee, Transaction as StarknetApiTransaction, TransactionHash};
 
 use crate::context::BlockContext;
+use crate::debug::get_execution_resources;
 use crate::execution::contract_class::ClassInfo;
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::fee::actual_cost::TransactionReceipt;
@@ -106,6 +107,7 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         block_context: &BlockContext,
         _charge_fee: bool,
         _validate: bool,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
 
@@ -115,6 +117,11 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         let execute_call_info =
             self.run_execute(state, &mut execution_resources, &mut context, &mut remaining_gas)?;
         let l1_handler_payload_size = self.payload_size();
+
+        if let Some(tx_hash) = tx_hash {
+            let resources = get_execution_resources(tx_hash);
+            execution_resources = resources;
+        }
 
         let TransactionReceipt { fee: actual_fee, da_gas, resources: actual_resources, .. } =
             TransactionReceipt::from_l1_handler(
@@ -151,13 +158,14 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
         block_context: &BlockContext,
         charge_fee: bool,
         validate: bool,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         match self {
             Self::AccountTransaction(account_tx) => {
-                account_tx.execute_raw(state, block_context, charge_fee, validate)
+                account_tx.execute_raw(state, block_context, charge_fee, validate, tx_hash)
             }
             Self::L1HandlerTransaction(tx) => {
-                tx.execute_raw(state, block_context, charge_fee, validate)
+                tx.execute_raw(state, block_context, charge_fee, validate, tx_hash)
             }
         }
     }
