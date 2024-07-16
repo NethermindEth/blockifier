@@ -577,8 +577,8 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         }
 
         Ok(U256 {
-            lo: u128::from(state[2]) | (u128::from(state[3]) << 64),
-            hi: u128::from(state[0]) | (u128::from(state[1]) << 64),
+            hi: u128::from(state[2]) | (u128::from(state[3]) << 64),
+            lo: u128::from(state[0]) | (u128::from(state[1]) << 64),
         })
     }
 
