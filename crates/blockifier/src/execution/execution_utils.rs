@@ -58,23 +58,6 @@ pub fn execute_entry_point_call(
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
 ) -> EntryPointExecutionResult<CallInfo> {
-    // let tx_hash = get_transaction_hash(
-    //     starknet_api::transaction::Transaction::Invoke(
-    //         InvokeTransaction::V3(InvokeTransactionV3 {
-    //             resource_bounds: Default::default(),
-    //             tip: Default::default(),
-    //             signature: Default::default(),
-    //             nonce: Default::default(),
-    //             sender_address: Default::default(),
-    //             calldata: Default::default(),
-    //             nonce_data_availability_mode: DataAvailabilityMode::L1,
-    //             fee_data_availability_mode: DataAvailabilityMode::L1,
-    //             paymaster_data: Default::default(),
-    //             account_deployment_data: Default::default(),
-    //         })
-    //     )
-    // )
-
     match contract_class {
         ContractClass::V0(contract_class) => {
             deprecated_entry_point_execution::execute_entry_point_call(
