@@ -445,97 +445,56 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         charge_fee: bool,
-        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         println!("AccountTransaction::run_non_revertible");
         let mut resources = ExecutionResources::default();
         let validate_call_info: Option<CallInfo>;
         let execute_call_info: Option<CallInfo>;
+
+        // The difference is on the match, and probably undesirably on the ordering of run_execute and
+        // handle validate tx
         if matches!(self, Self::DeployAccount(_)) {
             // Handle `DeployAccount` transactions separately, due to different order of things.
             // Also, the execution context required form the `DeployAccount` execute phase is
             // validation context.
             let mut execution_context =
                 EntryPointExecutionContext::new_validate(tx_context.clone(), charge_fee)?;
-            match program_cache {
-                Some(program_cache) => {
-                    execute_call_info = self.run_execute(
-                        state,
-                        &mut resources,
-                        &mut execution_context,
-                        remaining_gas,
-                        Some(program_cache),
-                    )?;
-                    validate_call_info = self.handle_validate_tx(
-                        state,
-                        &mut resources,
-                        tx_context.clone(),
-                        remaining_gas,
-                        validate,
-                        charge_fee,
-                        Some(program_cache),
-                    )?;
-                }
-                None => {
-                    execute_call_info = self.run_execute(
-                        state,
-                        &mut resources,
-                        &mut execution_context,
-                        remaining_gas,
-                        None,
-                    )?;
-                    validate_call_info = self.handle_validate_tx(
-                        state,
-                        &mut resources,
-                        tx_context.clone(),
-                        remaining_gas,
-                        validate,
-                        charge_fee,
-                        None,
-                    )?;
-                }
-            }
+            execute_call_info = self.run_execute(
+                state,
+                &mut resources,
+                &mut execution_context,
+                remaining_gas,
+                program_cache.as_deref_mut(),
+            )?;
+            validate_call_info = self.handle_validate_tx(
+                state,
+                &mut resources,
+                tx_context.clone(),
+                remaining_gas,
+                validate,
+                charge_fee,
+                program_cache,
+            )?;
         } else {
             let mut execution_context =
                 EntryPointExecutionContext::new_invoke(tx_context.clone(), charge_fee)?;
-            match program_cache {
-                Some(program_cache) => {
-                    validate_call_info = self.handle_validate_tx(
-                        state,
-                        &mut resources,
-                        tx_context.clone(),
-                        remaining_gas,
-                        validate,
-                        charge_fee,
-                        Some(program_cache),
-                    )?;
-                    execute_call_info = self.run_execute(
-                        state,
-                        &mut resources,
-                        &mut execution_context,
-                        remaining_gas,
-                        Some(program_cache),
-                    )?;
-                }
-                None => {
-                    validate_call_info = self.handle_validate_tx(
-                        state,
-                        &mut resources,
-                        tx_context.clone(),
-                        remaining_gas,
-                        validate,
-                        charge_fee,
-                        None,
-                    )?;
-                    execute_call_info = self.run_execute(
-                        state,
-                        &mut resources,
-                        &mut execution_context,
-                        remaining_gas,
-                        None,
-                    )?;
-                }
-            }
+            validate_call_info = self.handle_validate_tx(
+                state,
+                &mut resources,
+                tx_context.clone(),
+                remaining_gas,
+                validate,
+                charge_fee,
+                program_cache.as_deref_mut(),
+            )?;
+            execute_call_info = self.run_execute(
+                state,
+                &mut resources,
+                &mut execution_context,
+                remaining_gas,
+                program_cache,
+            )?;
         }
 
         let tx_receipt = TransactionReceipt::from_account_tx(
@@ -752,7 +711,11 @@ impl AccountTransaction {
     /// Returns 0 on non-declare transactions; for declare transactions, returns the class code
     /// size.
     pub(crate) fn declare_code_size(&self) -> usize {
-        if let Self::Declare(tx) = self { tx.class_info.code_size() } else { 0 }
+        if let Self::Declare(tx) = self {
+            tx.class_info.code_size()
+        } else {
+            0
+        }
     }
 
     fn is_non_revertible(&self, tx_info: &TransactionInfo) -> bool {
