@@ -525,7 +525,7 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         charge_fee: bool,
-        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         let mut resources = ExecutionResources::default();
         let mut execution_context =
@@ -537,97 +537,50 @@ impl AccountTransaction {
             execution_result,
             mut execution_state,
             execution_resources,
-        ) = match program_cache {
-            Some(program_cache) => {
-                // Run the validation, and if execution later fails, only keep the validation diff.
-                let validate_call_info = self.handle_validate_tx(
-                    state,
-                    &mut resources,
-                    tx_context.clone(),
-                    remaining_gas,
-                    validate,
-                    charge_fee,
-                    Some(program_cache),
-                )?;
+        ) = {
+            // Run the validation, and if execution later fails, only keep the validation diff.
+            let validate_call_info = self.handle_validate_tx(
+                state,
+                &mut resources,
+                tx_context.clone(),
+                remaining_gas,
+                validate,
+                charge_fee,
+                program_cache.as_deref_mut(),
+            )?;
 
-                let n_allotted_execution_steps = execution_context
-                    .subtract_validation_and_overhead_steps(
-                        &validate_call_info,
-                        &self.tx_type(),
-                        self.calldata_length(),
-                    );
-
-                // Save the state changes resulting from running `validate_tx`, to be used later for
-                // resource and fee calculation.
-                let validate_state_changes = state.get_actual_state_changes()?;
-
-                // Create copies of state and resources for the execution.
-                // Both will be rolled back if the execution is reverted or committed upon success.
-                let mut execution_resources = resources.clone();
-                let mut execution_state = CachedState::create_transactional(state);
-
-                let execution_result = self.run_execute(
-                    &mut execution_state,
-                    &mut execution_resources,
-                    &mut execution_context,
-                    remaining_gas,
-                    Some(program_cache),
+            let n_allotted_execution_steps = execution_context
+                .subtract_validation_and_overhead_steps(
+                    &validate_call_info,
+                    &self.tx_type(),
+                    self.calldata_length(),
                 );
 
-                (
-                    n_allotted_execution_steps,
-                    validate_state_changes,
-                    validate_call_info,
-                    execution_result,
-                    execution_state,
-                    execution_resources,
-                )
-            }
-            None => {
-                // Run the validation, and if execution later fails, only keep the validation diff.
-                let validate_call_info = self.handle_validate_tx(
-                    state,
-                    &mut resources,
-                    tx_context.clone(),
-                    remaining_gas,
-                    validate,
-                    charge_fee,
-                    None,
-                )?;
+            // Save the state changes resulting from running `validate_tx`, to be used later for
+            // resource and fee calculation.
+            let validate_state_changes = state.get_actual_state_changes()?;
 
-                let n_allotted_execution_steps = execution_context
-                    .subtract_validation_and_overhead_steps(
-                        &validate_call_info,
-                        &self.tx_type(),
-                        self.calldata_length(),
-                    );
+            // Create copies of state and resources for the execution.
+            // Both will be rolled back if the execution is reverted or committed upon success.
+            let mut execution_resources = resources.clone();
+            let mut execution_state = CachedState::create_transactional(state);
 
-                // Save the state changes resulting from running `validate_tx`, to be used later for
-                // resource and fee calculation.
-                let validate_state_changes = state.get_actual_state_changes()?;
+            let execution_result = self.run_execute(
+                &mut execution_state,
+                &mut execution_resources,
+                &mut execution_context,
+                remaining_gas,
+                program_cache,
+            );
 
-                // Create copies of state and resources for the execution.
-                // Both will be rolled back if the execution is reverted or committed upon success.
-                let mut execution_resources = resources.clone();
-                let mut execution_state = CachedState::create_transactional(state);
-
-                let execution_result = self.run_execute(
-                    &mut execution_state,
-                    &mut execution_resources,
-                    &mut execution_context,
-                    remaining_gas,
-                    None,
-                );
-
-                (
-                    n_allotted_execution_steps,
-                    validate_state_changes,
-                    validate_call_info,
-                    execution_result,
-                    execution_state,
-                    execution_resources,
-                )
-            }
+            (
+                n_allotted_execution_steps,
+                validate_state_changes,
+                validate_call_info,
+                execution_result,
+                execution_state,
+                execution_resources,
+            )
         };
 
         // Pre-compute cost in case of revert.
