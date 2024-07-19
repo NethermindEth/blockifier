@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
+use cairo_native::cache::ProgramCache;
 use cairo_native::starknet::{
     BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
     SyscallResult, TxInfo, TxV2Info, U256,
@@ -42,7 +43,7 @@ use crate::execution::syscalls::hint_processor::{
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
-pub struct NativeSyscallHandler<'state> {
+pub struct NativeSyscallHandler<'state, 'native> {
     // Input for execution
     pub state: &'state mut dyn State,
     pub execution_resources: &'state mut ExecutionResources,
@@ -60,9 +61,11 @@ pub struct NativeSyscallHandler<'state> {
     // Additional execution result info
     pub storage_read_values: Vec<StarkFelt>,
     pub accessed_storage_keys: HashSet<StorageKey, RandomState>,
+
+    pub program_cache: &'state mut ProgramCache<'native, ClassHash>,
 }
 
-impl<'state> NativeSyscallHandler<'_> {
+impl<'state, 'native> NativeSyscallHandler<'state, 'native> {
     pub fn new(
         state: &'state mut dyn State,
         caller_address: ContractAddress,
@@ -70,7 +73,8 @@ impl<'state> NativeSyscallHandler<'_> {
         entry_point_selector: EntryPointSelector,
         execution_resources: &'state mut ExecutionResources,
         execution_context: &'state mut EntryPointExecutionContext,
-    ) -> NativeSyscallHandler<'state> {
+        program_cache: &'state mut ProgramCache<'native, ClassHash>,
+    ) -> NativeSyscallHandler<'state, 'native> {
         NativeSyscallHandler {
             state,
             caller_address,
@@ -83,11 +87,12 @@ impl<'state> NativeSyscallHandler<'_> {
             inner_calls: Vec::new(),
             storage_read_values: Vec::new(),
             accessed_storage_keys: HashSet::new(),
+            program_cache,
         }
     }
 }
 
-impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
+impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'state, 'native> {
     fn get_block_hash(
         &mut self,
         block_number: u64,
@@ -320,6 +325,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             ctor_context,
             wrapper_calldata,
             u64::try_from(*remaining_gas).unwrap(),
+            Some(self.program_cache),
         )
         .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
@@ -389,7 +395,12 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -448,7 +459,12 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -577,8 +593,8 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         }
 
         Ok(U256 {
-            lo: u128::from(state[2]) | (u128::from(state[3]) << 64),
-            hi: u128::from(state[0]) | (u128::from(state[1]) << 64),
+            hi: u128::from(state[2]) | (u128::from(state[3]) << 64),
+            lo: u128::from(state[0]) | (u128::from(state[1]) << 64),
         })
     }
 
@@ -820,19 +836,11 @@ where
     ark_ff::BigInt<4>: From<<Curve>::BaseField>,
 {
     fn from(point: Affine<Curve>) -> Self {
-        // A workaround for turning big4int into a u256 that matches the way the
-        // result of native and VM are displayed.
-        // Having to swap around is most-likely a bug, but best investigated after
-        // https://github.com/NethermindEth/blockifier/issues/97
-        fn swap(x: U256) -> U256 {
-            U256 { hi: x.lo, lo: x.hi }
-        }
-
         // Here /into/ must be used, accessing the BigInt via .0 will lead to an
         // transformation being missed.
         let x = big4int_to_u256(point.x.into());
         let y = big4int_to_u256(point.y.into());
 
-        Self { x: swap(x), y: swap(y), _phantom: Default::default() }
+        Self { x, y, _phantom: Default::default() }
     }
 }

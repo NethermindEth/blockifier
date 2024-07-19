@@ -1,7 +1,5 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::RandomState;
-use std::rc::Rc;
 
 use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
@@ -74,25 +72,19 @@ pub fn match_entrypoint(
 static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
     std::sync::OnceLock::new();
 
-pub fn get_native_aot_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
-    Rc::new(RefCell::new(ProgramCache::Aot(AotProgramCache::new(
-        NATIVE_CONTEXT.get_or_init(NativeContext::new),
-    ))))
+pub fn get_native_aot_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
+    ProgramCache::Aot(AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
-pub fn get_native_jit_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
-    Rc::new(RefCell::new(ProgramCache::Jit(JitProgramCache::new(
-        NATIVE_CONTEXT.get_or_init(NativeContext::new),
-    ))))
+pub fn get_native_jit_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
+    ProgramCache::Jit(JitProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
 pub fn get_native_executor<'context>(
     class_hash: ClassHash,
     program: &SierraProgram,
-    program_cache: Rc<RefCell<ProgramCache<'context, ClassHash>>>,
+    program_cache: &mut ProgramCache<'context, ClassHash>,
 ) -> NativeExecutor<'context> {
-    let program_cache = &mut (*program_cache.borrow_mut());
-
     match program_cache {
         ProgramCache::Aot(cache) => {
             let cached_executor = cache.get(&class_hash);
@@ -146,7 +138,7 @@ pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
     call: CallEntryPoint,
-    mut syscall_handler: NativeSyscallHandler<'_>,
+    mut syscall_handler: NativeSyscallHandler<'_, '_>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let stark_felts_to_native_felts = |data: &[StarkFelt]| -> Vec<Felt> {
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
@@ -227,7 +219,7 @@ pub fn u256_to_biguint(u256: U256) -> BigUint {
     let lo = BigUint::from(u256.lo);
     let hi = BigUint::from(u256.hi);
 
-    hi + (lo << 128) // 128 is the size of lo
+    (hi << 128) + lo
 }
 
 pub fn big4int_to_u256(b_int: BigInt<4>) -> U256 {

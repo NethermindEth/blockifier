@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
-use starknet_api::core::{calculate_contract_address, ContractAddress};
+use starknet_api::core::{calculate_contract_address, ClassHash, ContractAddress};
 use starknet_api::transaction::{Fee, Transaction as StarknetApiTransaction, TransactionHash};
 
 use crate::context::BlockContext;
@@ -107,6 +108,7 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         block_context: &BlockContext,
         _charge_fee: bool,
         _validate: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
         tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
@@ -114,8 +116,13 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         let mut execution_resources = ExecutionResources::default();
         let mut context = EntryPointExecutionContext::new_invoke(tx_context.clone(), true)?;
         let mut remaining_gas = block_context.versioned_constants.tx_initial_gas();
-        let execute_call_info =
-            self.run_execute(state, &mut execution_resources, &mut context, &mut remaining_gas)?;
+        let execute_call_info = self.run_execute(
+            state,
+            &mut execution_resources,
+            &mut context,
+            &mut remaining_gas,
+            program_cache,
+        )?;
         let l1_handler_payload_size = self.payload_size();
 
         if let Some(tx_hash) = tx_hash {
@@ -158,14 +165,15 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
         block_context: &BlockContext,
         charge_fee: bool,
         validate: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
         tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         match self {
             Self::AccountTransaction(account_tx) => {
-                account_tx.execute_raw(state, block_context, charge_fee, validate, tx_hash)
+                account_tx.execute_raw(state, block_context, charge_fee, validate, program_cache, tx_hash)
             }
             Self::L1HandlerTransaction(tx) => {
-                tx.execute_raw(state, block_context, charge_fee, validate, tx_hash)
+                tx.execute_raw(state, block_context, charge_fee, validate, program_cache, tx_hash)
             }
         }
     }
