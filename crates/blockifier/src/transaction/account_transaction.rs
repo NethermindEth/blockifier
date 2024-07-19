@@ -452,8 +452,6 @@ impl AccountTransaction {
         let validate_call_info: Option<CallInfo>;
         let execute_call_info: Option<CallInfo>;
 
-        // The difference is on the match, and probably undesirably on the ordering of run_execute and
-        // handle validate tx
         if matches!(self, Self::DeployAccount(_)) {
             // Handle `DeployAccount` transactions separately, due to different order of things.
             // Also, the execution context required form the `DeployAccount` execute phase is
@@ -716,7 +714,7 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
         block_context: &BlockContext,
         charge_fee: bool,
         validate: bool,
-        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
         self.verify_tx_version(tx_context.tx_info.version())?;
@@ -735,71 +733,37 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             final_da_gas,
             final_resources,
             revert_error,
-        ) = match program_cache {
-            Some(program_cache) => {
-                let ValidateExecuteCallInfo {
-                    validate_call_info,
-                    execute_call_info,
-                    revert_error,
-                    final_cost:
-                        TransactionReceipt {
-                            fee: final_fee,
-                            da_gas: final_da_gas,
-                            resources: final_resources,
-                            ..
-                        },
-                } = self.run_or_revert(
-                    state,
-                    &mut remaining_gas,
-                    tx_context.clone(),
-                    validate,
-                    charge_fee,
-                    Some(program_cache),
-                )?;
-                let fee_transfer_call_info =
-                    self.handle_fee(state, tx_context, final_fee, charge_fee, Some(program_cache))?;
-                (
-                    validate_call_info,
-                    execute_call_info,
-                    fee_transfer_call_info,
-                    final_fee,
-                    final_da_gas,
-                    final_resources,
-                    revert_error,
-                )
-            }
-            None => {
-                let ValidateExecuteCallInfo {
-                    validate_call_info,
-                    execute_call_info,
-                    revert_error,
-                    final_cost:
-                        TransactionReceipt {
-                            fee: final_fee,
-                            da_gas: final_da_gas,
-                            resources: final_resources,
-                            ..
-                        },
-                } = self.run_or_revert(
-                    state,
-                    &mut remaining_gas,
-                    tx_context.clone(),
-                    validate,
-                    charge_fee,
-                    None,
-                )?;
-                let fee_transfer_call_info =
-                    self.handle_fee(state, tx_context, final_fee, charge_fee, None)?;
-                (
-                    validate_call_info,
-                    execute_call_info,
-                    fee_transfer_call_info,
-                    final_fee,
-                    final_da_gas,
-                    final_resources,
-                    revert_error,
-                )
-            }
+        ) = {
+            let ValidateExecuteCallInfo {
+                validate_call_info,
+                execute_call_info,
+                revert_error,
+                final_cost:
+                    TransactionReceipt {
+                        fee: final_fee,
+                        da_gas: final_da_gas,
+                        resources: final_resources,
+                        ..
+                    },
+            } = self.run_or_revert(
+                state,
+                &mut remaining_gas,
+                tx_context.clone(),
+                validate,
+                charge_fee,
+                program_cache.as_deref_mut(),
+            )?;
+            let fee_transfer_call_info =
+                self.handle_fee(state, tx_context, final_fee, charge_fee, program_cache)?;
+            (
+                validate_call_info,
+                execute_call_info,
+                fee_transfer_call_info,
+                final_fee,
+                final_da_gas,
+                final_resources,
+                revert_error,
+            )
         };
 
         let tx_execution_info = TransactionExecutionInfo {
