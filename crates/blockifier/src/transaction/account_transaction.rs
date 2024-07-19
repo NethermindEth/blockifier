@@ -528,58 +528,39 @@ impl AccountTransaction {
         let mut resources = ExecutionResources::default();
         let mut execution_context =
             EntryPointExecutionContext::new_invoke(tx_context.clone(), charge_fee)?;
-        let (
-            n_allotted_execution_steps,
-            validate_state_changes,
-            validate_call_info,
-            execution_result,
-            mut execution_state,
-            execution_resources,
-        ) = {
-            // Run the validation, and if execution later fails, only keep the validation diff.
-            let validate_call_info = self.handle_validate_tx(
-                state,
-                &mut resources,
-                tx_context.clone(),
-                remaining_gas,
-                validate,
-                charge_fee,
-                program_cache.as_deref_mut(),
-            )?;
+        // Run the validation, and if execution later fails, only keep the validation diff.
+        let validate_call_info = self.handle_validate_tx(
+            state,
+            &mut resources,
+            tx_context.clone(),
+            remaining_gas,
+            validate,
+            charge_fee,
+            program_cache.as_deref_mut(),
+        )?;
 
-            let n_allotted_execution_steps = execution_context
-                .subtract_validation_and_overhead_steps(
-                    &validate_call_info,
-                    &self.tx_type(),
-                    self.calldata_length(),
-                );
+        let n_allotted_execution_steps = execution_context.subtract_validation_and_overhead_steps(
+            &validate_call_info,
+            &self.tx_type(),
+            self.calldata_length(),
+        );
 
-            // Save the state changes resulting from running `validate_tx`, to be used later for
-            // resource and fee calculation.
-            let validate_state_changes = state.get_actual_state_changes()?;
+        // Save the state changes resulting from running `validate_tx`, to be used later for
+        // resource and fee calculation.
+        let validate_state_changes = state.get_actual_state_changes()?;
 
-            // Create copies of state and resources for the execution.
-            // Both will be rolled back if the execution is reverted or committed upon success.
-            let mut execution_resources = resources.clone();
-            let mut execution_state = CachedState::create_transactional(state);
+        // Create copies of state and resources for the execution.
+        // Both will be rolled back if the execution is reverted or committed upon success.
+        let mut execution_resources = resources.clone();
+        let mut execution_state = CachedState::create_transactional(state);
 
-            let execution_result = self.run_execute(
-                &mut execution_state,
-                &mut execution_resources,
-                &mut execution_context,
-                remaining_gas,
-                program_cache,
-            );
-
-            (
-                n_allotted_execution_steps,
-                validate_state_changes,
-                validate_call_info,
-                execution_result,
-                execution_state,
-                execution_resources,
-            )
-        };
+        let execution_result = self.run_execute(
+            &mut execution_state,
+            &mut execution_resources,
+            &mut execution_context,
+            remaining_gas,
+            program_cache,
+        );
 
         // Pre-compute cost in case of revert.
         let execution_steps_consumed =
@@ -725,46 +706,27 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
 
         // Run validation and execution.
         let mut remaining_gas = block_context.versioned_constants.tx_initial_gas();
-        let (
+        let ValidateExecuteCallInfo {
             validate_call_info,
             execute_call_info,
-            fee_transfer_call_info,
-            final_fee,
-            final_da_gas,
-            final_resources,
             revert_error,
-        ) = {
-            let ValidateExecuteCallInfo {
-                validate_call_info,
-                execute_call_info,
-                revert_error,
-                final_cost:
-                    TransactionReceipt {
-                        fee: final_fee,
-                        da_gas: final_da_gas,
-                        resources: final_resources,
-                        ..
-                    },
-            } = self.run_or_revert(
-                state,
-                &mut remaining_gas,
-                tx_context.clone(),
-                validate,
-                charge_fee,
-                program_cache.as_deref_mut(),
-            )?;
-            let fee_transfer_call_info =
-                self.handle_fee(state, tx_context, final_fee, charge_fee, program_cache)?;
-            (
-                validate_call_info,
-                execute_call_info,
-                fee_transfer_call_info,
-                final_fee,
-                final_da_gas,
-                final_resources,
-                revert_error,
-            )
-        };
+            final_cost:
+                TransactionReceipt {
+                    fee: final_fee,
+                    da_gas: final_da_gas,
+                    resources: final_resources,
+                    ..
+                },
+        } = self.run_or_revert(
+            state,
+            &mut remaining_gas,
+            tx_context.clone(),
+            validate,
+            charge_fee,
+            program_cache.as_deref_mut(),
+        )?;
+        let fee_transfer_call_info =
+            self.handle_fee(state, tx_context, final_fee, charge_fee, program_cache)?;
 
         let tx_execution_info = TransactionExecutionInfo {
             validate_call_info,
