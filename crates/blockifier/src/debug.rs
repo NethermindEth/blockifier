@@ -18,7 +18,10 @@ pub fn get_execution_resources(tx_hash: TransactionHash) -> ExecutionResources {
 
     let tx_hash_fe = FieldElement::from(tx_hash.0);
     let rt = Runtime::new().unwrap();
-    let tx_receipt = rt.block_on(rpc_client.get_transaction_receipt(tx_hash_fe)).unwrap();
+    let tx_receipt =
+        rt.block_on(rpc_client.get_transaction_receipt(tx_hash_fe)).unwrap_or_else(|err| {
+            panic!("Error occured: {:?}", err);
+        });
 
     let receipt = if let Receipt(TransactionReceipt::Invoke(receipt)) = tx_receipt {
         receipt
