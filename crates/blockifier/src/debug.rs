@@ -1,3 +1,4 @@
+#![allow(clippy::as_conversions)]
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -11,7 +12,7 @@ use starknet_providers::{JsonRpcClient, Provider, Url};
 use tokio::runtime::Runtime;
 
 pub fn get_execution_resources(tx_hash: TransactionHash) -> ExecutionResources {
-    println!("Getting execution resources for {}", tx_hash.to_string());
+    println!("Getting execution resources for {}", tx_hash);
 
     let rpc_url = std::env::var("RPC_URL").unwrap_or("http://localhost:6060".to_string());
     let rpc_client = JsonRpcClient::new(HttpTransport::new(Url::from_str(&rpc_url).unwrap()));

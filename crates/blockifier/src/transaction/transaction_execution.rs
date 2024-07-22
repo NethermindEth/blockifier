@@ -169,9 +169,14 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
         tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         match self {
-            Self::AccountTransaction(account_tx) => {
-                account_tx.execute_raw(state, block_context, charge_fee, validate, program_cache, tx_hash)
-            }
+            Self::AccountTransaction(account_tx) => account_tx.execute_raw(
+                state,
+                block_context,
+                charge_fee,
+                validate,
+                program_cache,
+                tx_hash,
+            ),
             Self::L1HandlerTransaction(tx) => {
                 tx.execute_raw(state, block_context, charge_fee, validate, program_cache, tx_hash)
             }

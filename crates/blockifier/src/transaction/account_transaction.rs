@@ -441,6 +441,7 @@ impl AccountTransaction {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run_non_revertible<S: StateReader>(
         &self,
         state: &mut TransactionalState<'_, S>,
@@ -524,6 +525,7 @@ impl AccountTransaction {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run_revertible<S: StateReader>(
         &self,
         state: &mut TransactionalState<'_, S>,
@@ -674,6 +676,7 @@ impl AccountTransaction {
     }
 
     /// Runs validation and execution.
+    #[allow(clippy::too_many_arguments)]
     fn run_or_revert<S: StateReader>(
         &self,
         state: &mut TransactionalState<'_, S>,
