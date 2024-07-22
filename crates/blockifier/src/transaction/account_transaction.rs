@@ -449,6 +449,7 @@ impl AccountTransaction {
         validate: bool,
         charge_fee: bool,
         mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        tx_hash: Option<TransactionHash>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         println!("AccountTransaction::run_non_revertible");
         let mut resources = ExecutionResources::default();
@@ -496,6 +497,10 @@ impl AccountTransaction {
                 remaining_gas,
                 program_cache,
             )?;
+        }
+
+        if let Some(tx_hash) = tx_hash {
+            resources = get_execution_resources(tx_hash);
         }
 
         let tx_receipt = TransactionReceipt::from_account_tx(
@@ -566,6 +571,11 @@ impl AccountTransaction {
             program_cache,
         );
 
+        if let Some(tx_hash) = tx_hash {
+            let resources = get_execution_resources(tx_hash);
+            execution_resources = resources;
+        }
+
         // Pre-compute cost in case of revert.
         let execution_steps_consumed =
             n_allotted_execution_steps - execution_context.n_remaining_steps();
@@ -577,11 +587,6 @@ impl AccountTransaction {
             validate_call_info.iter(),
             execution_steps_consumed,
         )?;
-
-        if let Some(tx_hash) = tx_hash {
-            let resources = get_execution_resources(tx_hash);
-            execution_resources = resources;
-        }
 
         match execution_result {
             Ok(execute_call_info) => {
@@ -687,10 +692,19 @@ impl AccountTransaction {
                 validate,
                 charge_fee,
                 program_cache,
+                tx_hash,
             );
         }
 
-        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee, program_cache, tx_hash)
+        self.run_revertible(
+            state,
+            tx_context,
+            remaining_gas,
+            validate,
+            charge_fee,
+            program_cache,
+            tx_hash,
+        )
     }
 }
 

@@ -14,6 +14,7 @@ use starknet_api::transaction::{
 
 use crate::abi::abi_utils::selector_from_name;
 use crate::context::{BlockContext, TransactionContext};
+use crate::debug::get_execution_resources;
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::{ClassInfo, ContractClass};
 use crate::execution::entry_point::{
@@ -321,7 +322,7 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
             storage_address: self.contract_address,
             caller_address: ContractAddress::default(),
         };
-        let call_info = execute_deployment(
+        let mut call_info = execute_deployment(
             state,
             resources,
             context,
@@ -331,6 +332,8 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
             program_cache,
         )?;
         update_remaining_gas(remaining_gas, &call_info);
+
+        call_info.resources = get_execution_resources(self.tx_hash);
 
         Ok(Some(call_info))
     }
@@ -429,16 +432,17 @@ impl<S: State> Executable<S> for InvokeTransaction {
             initial_gas: *remaining_gas,
         };
 
-        let call_info =
-            execute_call.execute(state, resources, context, program_cache).map_err(|error| {
-                TransactionExecutionError::ExecutionError {
-                    error,
-                    class_hash,
-                    storage_address,
-                    selector: entry_point_selector,
-                }
+        let mut call_info = execute_call
+            .execute(state, resources, context, program_cache)
+            .map_err(|error| TransactionExecutionError::ExecutionError {
+                error,
+                class_hash,
+                storage_address,
+                selector: entry_point_selector,
             })?;
         update_remaining_gas(remaining_gas, &call_info);
+
+        call_info.resources = get_execution_resources(self.tx_hash);
 
         Ok(Some(call_info))
     }
@@ -549,14 +553,21 @@ impl<S: State> Executable<S> for L1HandlerTransaction {
             initial_gas: *remaining_gas,
         };
 
-        execute_call.execute(state, resources, context, program_cache).map(Some).map_err(|error| {
-            TransactionExecutionError::ExecutionError {
+        execute_call
+            .execute(state, resources, context, program_cache)
+            .map(Some)
+            .map_err(|error| TransactionExecutionError::ExecutionError {
                 error,
                 class_hash,
                 storage_address,
                 selector,
-            }
-        })
+            })
+            .map(|e| {
+                e.map(|mut call_info| {
+                    call_info.resources = get_execution_resources(self.tx_hash);
+                    call_info
+                })
+            })
     }
 }
 
