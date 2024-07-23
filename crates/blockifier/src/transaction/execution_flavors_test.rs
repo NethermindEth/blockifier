@@ -178,7 +178,7 @@ fn test_simulate_validate_charge_fee_pre_validate(
     let result = account_invoke_tx(
         invoke_tx_args! {nonce: invalid_nonce, ..pre_validation_base_args.clone()},
     )
-    .execute(&mut state, &block_context, charge_fee, validate, None);
+    .execute(&mut state, &block_context, charge_fee, validate);
     assert_matches!(
         result.unwrap_err(),
         TransactionExecutionError::TransactionPreValidationError(
@@ -206,7 +206,7 @@ fn test_simulate_validate_charge_fee_pre_validate(
         nonce: nonce_manager.next(account_address),
         ..pre_validation_base_args.clone()
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None);
+    .execute(&mut state, &block_context, charge_fee, validate);
     if !charge_fee {
         check_gas_and_fee(
             &block_context,
@@ -250,7 +250,7 @@ fn test_simulate_validate_charge_fee_pre_validate(
         nonce: nonce_manager.next(account_address),
         ..pre_validation_base_args.clone()
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None);
+    .execute(&mut state, &block_context, charge_fee, validate);
     if !charge_fee {
         check_gas_and_fee(
             &block_context,
@@ -290,7 +290,7 @@ fn test_simulate_validate_charge_fee_pre_validate(
             nonce: nonce_manager.next(account_address),
             ..pre_validation_base_args
         })
-        .execute(&mut state, &block_context, charge_fee, validate, None);
+        .execute(&mut state, &block_context, charge_fee, validate);
         if !charge_fee {
             check_gas_and_fee(
                 &block_context,
@@ -357,7 +357,7 @@ fn test_simulate_validate_charge_fee_fail_validate(
         nonce: nonce_manager.next(faulty_account_address),
         only_query,
     })
-    .execute(&mut falliable_state, &block_context, charge_fee, validate, None);
+    .execute(&mut falliable_state, &block_context, charge_fee, validate);
     if !validate {
         // The reported fee should be the actual cost, regardless of whether or not fee is charged.
         check_gas_and_fee(
@@ -369,9 +369,10 @@ fn test_simulate_validate_charge_fee_fail_validate(
             actual_fee,
         );
     } else {
-        assert!(
-            result.unwrap_err().to_string().contains("An ASSERT_EQ instruction failed: 1 != 0.")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("An ASSERT_EQ instruction failed: 1 != 0."));
     }
 }
 
@@ -427,7 +428,7 @@ fn test_simulate_validate_charge_fee_mid_execution(
         nonce: nonce_manager.next(account_address),
         ..execution_base_args.clone()
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None)
+    .execute(&mut state, &block_context, charge_fee, validate)
     .unwrap();
     assert!(tx_execution_info.is_reverted());
     check_gas_and_fee(
@@ -469,7 +470,7 @@ fn test_simulate_validate_charge_fee_mid_execution(
         nonce: nonce_manager.next(account_address),
         ..execution_base_args.clone()
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None)
+    .execute(&mut state, &block_context, charge_fee, validate)
     .unwrap();
     assert_eq!(tx_execution_info.is_reverted(), charge_fee);
     if charge_fee {
@@ -521,7 +522,7 @@ fn test_simulate_validate_charge_fee_mid_execution(
         nonce: nonce_manager.next(account_address),
         ..execution_base_args
     })
-    .execute(&mut state, &low_step_block_context, charge_fee, validate, None)
+    .execute(&mut state, &low_step_block_context, charge_fee, validate)
     .unwrap();
     assert!(tx_execution_info.revert_error.clone().unwrap().contains("no remaining steps"));
     // Complete resources used are reported as actual_resources; but only the charged final fee is
@@ -604,7 +605,7 @@ fn test_simulate_validate_charge_fee_post_execution(
         version,
         only_query,
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None)
+    .execute(&mut state, &block_context, charge_fee, validate)
     .unwrap();
     assert_eq!(tx_execution_info.is_reverted(), charge_fee);
     if charge_fee {
@@ -669,17 +670,15 @@ fn test_simulate_validate_charge_fee_post_execution(
         version,
         only_query,
     })
-    .execute(&mut state, &block_context, charge_fee, validate, None)
+    .execute(&mut state, &block_context, charge_fee, validate)
     .unwrap();
     assert_eq!(tx_execution_info.is_reverted(), charge_fee);
     if charge_fee {
-        assert!(
-            tx_execution_info
-                .revert_error
-                .clone()
-                .unwrap()
-                .contains("Insufficient fee token balance.")
-        );
+        assert!(tx_execution_info
+            .revert_error
+            .clone()
+            .unwrap()
+            .contains("Insufficient fee token balance."));
     }
     check_gas_and_fee(
         &block_context,

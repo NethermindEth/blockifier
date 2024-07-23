@@ -1,9 +1,7 @@
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
-use cairo_native::cache::ProgramCache;
 use cairo_native::executor::NativeExecutor;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
-use starknet_api::core::ClassHash;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::{get_sierra_entry_function_id, match_entrypoint, run_native_executor};
@@ -20,7 +18,6 @@ pub fn execute_entry_point_call(
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
-    program_cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let sierra_program: &SierraProgram = &contract_class.sierra_program();
     let contract_entrypoints: &ContractEntryPoints = &contract_class.entry_points_by_type;
@@ -28,14 +25,13 @@ pub fn execute_entry_point_call(
     let matching_entrypoint =
         match_entrypoint(call.entry_point_type, call.entry_point_selector, contract_entrypoints)?;
 
-    let syscall_handler: NativeSyscallHandler<'_, '_> = NativeSyscallHandler::new(
+    let syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
         state,
         call.caller_address,
         call.storage_address,
         call.entry_point_selector,
         resources,
         context,
-        program_cache,
     );
 
     let sierra_entry_function_id =

@@ -259,7 +259,6 @@ pub fn deploy(
         ctor_context,
         request.constructor_calldata,
         *remaining_gas,
-        None,
     )?;
 
     let constructor_retdata =
@@ -688,10 +687,8 @@ pub fn keccak(
 
     if remainder != 0 {
         return Err(SyscallExecutionError::SyscallError {
-            error_data: vec![
-                StarkFelt::try_from(INVALID_INPUT_LENGTH_ERROR)
-                    .map_err(SyscallExecutionError::from)?,
-            ],
+            error_data: vec![StarkFelt::try_from(INVALID_INPUT_LENGTH_ERROR)
+                .map_err(SyscallExecutionError::from)?],
         });
     }
 

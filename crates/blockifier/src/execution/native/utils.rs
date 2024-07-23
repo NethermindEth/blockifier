@@ -154,7 +154,7 @@ pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
     call: CallEntryPoint,
-    mut syscall_handler: NativeSyscallHandler<'_, '_>,
+    mut syscall_handler: NativeSyscallHandler<'_>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let stark_felts_to_native_felts = |data: &[StarkFelt]| -> Vec<Felt> {
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()

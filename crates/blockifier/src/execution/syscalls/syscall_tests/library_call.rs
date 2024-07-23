@@ -49,7 +49,7 @@ fn test_library_call(test_contract: FeatureContract, expected_gas: u64) {
     };
 
     assert_eq!(
-        entry_point_call.execute_directly(&mut state, None).unwrap().execution,
+        entry_point_call.execute_directly(&mut state).unwrap().execution,
         CallExecution {
             retdata: retdata![stark_felt!(91_u16)],
             gas_consumed: expected_gas,
@@ -78,7 +78,7 @@ fn test_library_call_assert_fails(test_contract: FeatureContract) {
         ..trivial_external_entry_point_new(test_contract)
     };
 
-    let err = entry_point_call.execute_directly(&mut state, None).unwrap_err();
+    let err = entry_point_call.execute_directly(&mut state).unwrap_err();
     assert!(err.to_string().contains("x != y"));
 }
 
@@ -103,7 +103,11 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     // Todo(rodrigo): Execution resources from the VM & Native are mesaured differently
     // helper function to change the expected resource values from both of executions
     let if_sierra = |a, b| {
-        if matches!(test_contract, FeatureContract::SierraTestContract) { a } else { b }
+        if matches!(test_contract, FeatureContract::SierraTestContract) {
+            a
+        } else {
+            b
+        }
     };
 
     // Create expected call info tree.
@@ -231,5 +235,5 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         ..Default::default()
     };
 
-    assert_eq!(main_entry_point.execute_directly(&mut state, None).unwrap(), expected_call_info);
+    assert_eq!(main_entry_point.execute_directly(&mut state).unwrap(), expected_call_info);
 }
