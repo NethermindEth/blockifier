@@ -52,7 +52,6 @@ starknet_api = { workspace = true, features = ["testing"] }
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
-papyrus_common.workspace = true
 starknet-providers = "0.10.0"
 starknet-core = "0.10.0"
 tokio = { version = "1.38.0", features = ["full"] }
