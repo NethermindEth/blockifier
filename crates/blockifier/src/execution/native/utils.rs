@@ -76,6 +76,10 @@ pub fn get_native_aot_program_cache<'context>() -> ProgramCache<'context, ClassH
     ProgramCache::Aot(AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
+pub fn get_native_aot_program_cache_aot<'context>() -> AotProgramCache<'context, ClassHash> {
+    AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new))
+}
+
 pub fn get_native_jit_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
     ProgramCache::Jit(JitProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }

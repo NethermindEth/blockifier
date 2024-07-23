@@ -13,6 +13,8 @@ use cairo_lang_starknet_classes::contract_class::{
 };
 use cairo_lang_starknet_classes::NestedIntList;
 use cairo_lang_utils::bigint::BigUintAsHex;
+use cairo_native::executor::AotNativeExecutor;
+use cairo_native::OptLevel;
 use cairo_vm::serde::deserialize_program::{
     ApTracking, FlowTrackingData, HintParams, ReferenceManager,
 };
@@ -31,7 +33,9 @@ use starknet_api::deprecated_contract_class::{
 };
 
 use super::execution_utils::poseidon_hash_many_cost;
-use super::native::utils::contract_entrypoint_to_entrypoint_selector;
+use super::native::utils::{
+    contract_entrypoint_to_entrypoint_selector, get_native_aot_program_cache_aot,
+};
 use crate::abi::abi_utils::selector_from_name;
 use crate::abi::constants::{self, CONSTRUCTOR_ENTRY_POINT_NAME};
 use crate::execution::entry_point::CallEntryPoint;
@@ -51,7 +55,7 @@ pub mod test;
 
 pub type ContractClassResult<T> = Result<T, ContractClassError>;
 
-#[derive(Clone, Debug, Eq, PartialEq, derive_more::From)]
+#[derive(Clone, Debug, PartialEq, derive_more::From)]
 pub enum ContractClass {
     V0(ContractClassV0),
     V1(ContractClassV1),
@@ -130,7 +134,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -530,7 +534,7 @@ impl ClassInfo {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SierraContractClassV1(pub Arc<SierraContractClassV1Inner>);
 impl Deref for SierraContractClassV1 {
     type Target = SierraContractClassV1Inner;
@@ -580,17 +584,48 @@ impl TryFrom<SierraContractClass> for SierraContractClassV1 {
         // and another in its felt encoded form. This can be avoided by either:
         //   1. Having access to the encoding/decoding functions
         //   2. Refactoring the code on the Cairo mono-repo
+
+        let sierra_program = class.extract_sierra_program().unwrap();
+        let mut program_cache = get_native_aot_program_cache_aot();
+
+        // Todo rewrite compile and insert such that it doesn't need
+        let executor = program_cache.compile_and_insert(
+            Default::default(),
+            &sierra_program,
+            OptLevel::Default,
+        );
+
         Ok(Self(Arc::new(SierraContractClassV1Inner {
             sierra_program: class.extract_sierra_program().unwrap(),
             entry_points_by_type: class.entry_points_by_type,
             sierra_program_raw: class.sierra_program,
+            executor,
         })))
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct SierraContractClassV1Inner {
-    pub sierra_program: SierraProgram,
+    sierra_program: SierraProgram,
     pub entry_points_by_type: SierraContractEntryPoints,
     sierra_program_raw: Vec<BigUintAsHex>,
+    pub executor: Arc<AotNativeExecutor>,
+}
+
+// Eventually we want SierraProgram to be gone or not accessible
+// therefore we first remove the public definition and require the use
+// of a getter.
+impl SierraContractClassV1Inner {
+    pub fn sierra_program(&self) -> &SierraProgram {
+        &self.sierra_program
+    }
+}
+
+// todo(xrvdg) do we want to compare executors?
+impl PartialEq for SierraContractClassV1Inner {
+    fn eq(&self, other: &Self) -> bool {
+        self.sierra_program == other.sierra_program
+            && self.entry_points_by_type == other.entry_points_by_type
+            && self.sierra_program_raw == other.sierra_program_raw
+    }
 }
