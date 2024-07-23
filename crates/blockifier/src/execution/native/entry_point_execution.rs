@@ -52,9 +52,9 @@ pub fn execute_entry_point_call(
     let sierra_entry_function_id =
         get_sierra_entry_function_id(matching_entrypoint, sierra_program);
 
-    println!("running the Native Executor");
+    println!("Blockifier-Native: running the Native Executor");
     let result =
         run_native_executor(native_executor, sierra_entry_function_id, call, syscall_handler);
-    println!("Native Executor finished running");
+    println!("Blockifier-Native: Native Executor finished running");
     result
 }
