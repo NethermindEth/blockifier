@@ -1,14 +1,19 @@
+use std::io::{self, Write};
 use std::time::SystemTime;
 
-use cairo_lang_sierra::program::Program as SierraProgram;
+use cairo_lang_sierra::ids::{ConcreteLibfuncId, ConcreteTypeId, UserTypeId};
+use cairo_lang_sierra::program::{
+    ConcreteLibfuncLongId, ConcreteTypeLongId, GenericArg, Program as SierraProgram,
+};
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
 use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
+use itertools::Itertools;
 use starknet_api::core::ClassHash;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::{
-    get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor
+    get_native_executor, get_sierra_entry_function_id, match_entrypoint, run_native_executor,
 };
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::SierraContractClassV1;
@@ -26,7 +31,10 @@ pub fn execute_entry_point_call(
     context: &mut EntryPointExecutionContext,
     program_cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
-    println!("Starting execute_entry_point_call in native blockifier for class hash {}", call.class_hash.clone().unwrap());
+    println!(
+        "Starting execute_entry_point_call in native blockifier for class hash {}",
+        call.class_hash.clone().unwrap()
+    );
     let call_clone = call.clone();
     let now = SystemTime::now();
     let sierra_program: &SierraProgram = &contract_class.sierra_program;
@@ -37,13 +45,16 @@ pub fn execute_entry_point_call(
 
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Getting/creating cache at {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+            println!(
+                "Getting/creating cache at {}s",
+                (elapsed.as_micros() as f64) / (1000000 as f64)
+            );
         }
         Err(e) => println!("Error timing {e}"),
     }
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Got/created cache at {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+            println!("Got/created cache at {}s", (elapsed.as_micros() as f64) / (1000000 as f64));
         }
         Err(e) => println!("Error timing {e}"),
     }
@@ -57,7 +68,7 @@ pub fn execute_entry_point_call(
 
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Got executor after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+            println!("Got executor after {}s", (elapsed.as_micros() as f64) / (1000000 as f64));
         }
         Err(e) => println!("Error timing {e}"),
     }
@@ -69,12 +80,15 @@ pub fn execute_entry_point_call(
         call.entry_point_selector,
         resources,
         context,
-        program_cache
+        program_cache,
     );
 
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Got syscall handler after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+            println!(
+                "Got syscall handler after {}s",
+                (elapsed.as_micros() as f64) / (1000000 as f64)
+            );
         }
         Err(e) => println!("Error timing {e}"),
     }
@@ -84,7 +98,7 @@ pub fn execute_entry_point_call(
 
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Setup finished after {}s", (elapsed.as_micros() as f64)/(1000000 as f64));
+            println!("Setup finished after {}s", (elapsed.as_micros() as f64) / (1000000 as f64));
         }
         Err(e) => println!("Error timing {e}"),
     }
@@ -101,7 +115,11 @@ pub fn execute_entry_point_call(
         run_native_executor(native_executor, sierra_entry_function_id, call, syscall_handler);
     match now.elapsed() {
         Ok(elapsed) => {
-            println!("Native execution finished after {}s for class hash {}", (elapsed.as_micros() as f64)/(1000000 as f64), call_clone.class_hash.unwrap());
+            println!(
+                "Native execution finished after {}s for class hash {}",
+                (elapsed.as_micros() as f64) / (1000000 as f64),
+                call_clone.class_hash.unwrap()
+            );
         }
         Err(e) => println!("Error timing {e}"),
     }

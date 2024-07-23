@@ -32,12 +32,16 @@ use crate::versioned_constants::{
 impl CallEntryPoint {
     /// Executes the call directly, without account context. Limits the number of steps by resource
     /// bounds.
-    pub fn execute_directly(self, state: &mut dyn State, program_cache: Option<&mut ProgramCache<'_, ClassHash>>) -> EntryPointExecutionResult<CallInfo> {
+    pub fn execute_directly(
+        self,
+        state: &mut dyn State,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+    ) -> EntryPointExecutionResult<CallInfo> {
         self.execute_directly_given_tx_info(
             state,
             TransactionInfo::Deprecated(DeprecatedTransactionInfo::default()),
             true,
-            program_cache
+            program_cache,
         )
     }
 
@@ -67,7 +71,7 @@ impl CallEntryPoint {
             state,
             TransactionInfo::Deprecated(DeprecatedTransactionInfo::default()),
             true,
-            program_cache
+            program_cache,
         )
     }
 

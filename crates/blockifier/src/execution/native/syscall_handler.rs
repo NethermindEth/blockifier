@@ -404,7 +404,12 @@ impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'stat
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -464,7 +469,12 @@ impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'stat
         };
 
         let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context, Some(self.program_cache))
+            .execute(
+                self.state,
+                self.execution_resources,
+                self.execution_context,
+                Some(self.program_cache),
+            )
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         let retdata = call_info
@@ -508,7 +518,11 @@ impl<'state, 'native> StarknetSyscallHandler for &mut NativeSyscallHandler<'stat
         value: Felt,
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
-        println!("Running native syscall integration: storage_write");
+        println!(
+            "Running native syscall integration: storage_write. Writing {value} to {address} at \
+             contract address {}",
+            self.contract_address.0.key()
+        );
         let key = StorageKey(
             PatriciaKey::try_from(native_felt_to_stark_felt(address))
                 .map_err(|e| encode_str_as_felts(&e.to_string()))?,

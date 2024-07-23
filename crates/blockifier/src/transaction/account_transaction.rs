@@ -734,11 +734,7 @@ impl AccountTransaction {
     /// Returns 0 on non-declare transactions; for declare transactions, returns the class code
     /// size.
     pub(crate) fn declare_code_size(&self) -> usize {
-        if let Self::Declare(tx) = self {
-            tx.class_info.code_size()
-        } else {
-            0
-        }
+        if let Self::Declare(tx) = self { tx.class_info.code_size() } else { 0 }
     }
 
     fn is_non_revertible(&self, tx_info: &TransactionInfo) -> bool {
@@ -842,7 +838,8 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
                     charge_fee,
                     Some(program_cache),
                 )?;
-                let fee_transfer_call_info = self.handle_fee(state, tx_context, final_fee, charge_fee, Some(program_cache))?;
+                let fee_transfer_call_info =
+                    self.handle_fee(state, tx_context, final_fee, charge_fee, Some(program_cache))?;
                 (
                     validate_call_info,
                     execute_call_info,
@@ -873,7 +870,8 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
                     charge_fee,
                     None,
                 )?;
-                let fee_transfer_call_info = self.handle_fee(state, tx_context, final_fee, charge_fee, None)?;
+                let fee_transfer_call_info =
+                    self.handle_fee(state, tx_context, final_fee, charge_fee, None)?;
                 (
                     validate_call_info,
                     execute_call_info,

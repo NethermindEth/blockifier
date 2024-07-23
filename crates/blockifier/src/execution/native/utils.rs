@@ -74,9 +74,9 @@ pub fn match_entrypoint(
 static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
     std::sync::OnceLock::new();
 
-// static NATIVE_CACHE: std::sync::Mutex<ProgramCache<'_, ClassHash>> = std::sync::Mutex::new(ProgramCache::Aot(AotProgramCache::new(
-//     NATIVE_CONTEXT.get_or_init(NativeContext::new),
-// )));
+// static NATIVE_CACHE: std::sync::Mutex<ProgramCache<'_, ClassHash>> =
+// std::sync::Mutex::new(ProgramCache::Aot(AotProgramCache::new(     NATIVE_CONTEXT.
+// get_or_init(NativeContext::new), )));
 
 pub fn get_native_aot_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
     Rc::new(RefCell::new(ProgramCache::Aot(AotProgramCache::new(

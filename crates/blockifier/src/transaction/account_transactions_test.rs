@@ -276,8 +276,10 @@ fn test_max_fee_limit_validate(
             constructor_calldata: calldata![ctor_grind_arg, ctor_storage_arg],
         },
     );
-    let error_trace =
-        deploy_account_tx.execute(&mut state, &block_context, true, true, None).unwrap_err().to_string();
+    let error_trace = deploy_account_tx
+        .execute(&mut state, &block_context, true, true, None)
+        .unwrap_err()
+        .to_string();
     assert!(error_trace.contains("no remaining steps"));
 
     // Deploy grindy account successfully this time.
@@ -895,7 +897,8 @@ fn test_max_fee_to_max_steps_conversion(
     let tx_context1 = Arc::new(block_context.to_tx_context(&account_tx1));
     let execution_context1 = EntryPointExecutionContext::new_invoke(tx_context1, true).unwrap();
     let max_steps_limit1 = execution_context1.vm_run_resources.get_n_steps();
-    let tx_execution_info1 = account_tx1.execute(&mut state, &block_context, true, true, None).unwrap();
+    let tx_execution_info1 =
+        account_tx1.execute(&mut state, &block_context, true, true, None).unwrap();
     let n_steps1 = tx_execution_info1.actual_resources.vm_resources.n_steps;
     let gas_used_vector1 = tx_execution_info1
         .actual_resources
@@ -914,7 +917,8 @@ fn test_max_fee_to_max_steps_conversion(
     let tx_context2 = Arc::new(block_context.to_tx_context(&account_tx2));
     let execution_context2 = EntryPointExecutionContext::new_invoke(tx_context2, true).unwrap();
     let max_steps_limit2 = execution_context2.vm_run_resources.get_n_steps();
-    let tx_execution_info2 = account_tx2.execute(&mut state, &block_context, true, true, None).unwrap();
+    let tx_execution_info2 =
+        account_tx2.execute(&mut state, &block_context, true, true, None).unwrap();
     let n_steps2 = tx_execution_info2.actual_resources.vm_resources.n_steps;
     let gas_used_vector2 = tx_execution_info2
         .actual_resources
@@ -1098,7 +1102,8 @@ fn test_count_actual_storage_changes(
         nonce: nonce_manager.next(account_address),
     };
     let account_tx = account_invoke_tx(invoke_args.clone());
-    let execution_info = account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
+    let execution_info =
+        account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
 
     let fee_1 = execution_info.actual_fee;
     let state_changes_1 = state.get_actual_state_changes().unwrap();
@@ -1142,7 +1147,8 @@ fn test_count_actual_storage_changes(
         nonce: nonce_manager.next(account_address),
         ..invoke_args.clone()
     });
-    let execution_info = account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
+    let execution_info =
+        account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
 
     let fee_2 = execution_info.actual_fee;
     let state_changes_2 = state.get_actual_state_changes().unwrap();
@@ -1179,7 +1185,8 @@ fn test_count_actual_storage_changes(
         calldata: transfer_calldata,
         ..invoke_args
     });
-    let execution_info = account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
+    let execution_info =
+        account_tx.execute_raw(&mut state, &block_context, true, true, None).unwrap();
 
     let fee_transfer = execution_info.actual_fee;
     let state_changes_transfer = state.get_actual_state_changes().unwrap();

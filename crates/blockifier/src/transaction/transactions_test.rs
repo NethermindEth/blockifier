@@ -873,7 +873,8 @@ fn test_insufficient_resource_bounds(
     let invalid_v1_tx = account_invoke_tx(
         invoke_tx_args! { max_fee: invalid_max_fee, ..valid_invoke_tx_args.clone() },
     );
-    let execution_error = invalid_v1_tx.execute(state, block_context, true, true, None).unwrap_err();
+    let execution_error =
+        invalid_v1_tx.execute(state, block_context, true, true, None).unwrap_err();
 
     // Test error.
     assert_matches!(
@@ -896,7 +897,8 @@ fn test_insufficient_resource_bounds(
         version: TransactionVersion::THREE,
         ..valid_invoke_tx_args.clone()
     });
-    let execution_error = invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
+    let execution_error =
+        invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
     // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion works.
     let minimal_l1_gas_as_u64 =
         u64::try_from(minimal_l1_gas).expect("Failed to convert u128 to u64.");
@@ -919,7 +921,8 @@ fn test_insufficient_resource_bounds(
         version: TransactionVersion::THREE,
         ..valid_invoke_tx_args
     });
-    let execution_error = invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
+    let execution_error =
+        invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
     assert_matches!(
         execution_error,
         TransactionExecutionError::TransactionPreValidationError(
@@ -1618,7 +1621,8 @@ fn test_valid_flag(
         max_fee: Fee(MAX_FEE)
     });
 
-    let actual_execution_info = account_tx.execute(state, block_context, true, false, None).unwrap();
+    let actual_execution_info =
+        account_tx.execute(state, block_context, true, false, None).unwrap();
 
     assert!(actual_execution_info.validate_call_info.is_none());
 }

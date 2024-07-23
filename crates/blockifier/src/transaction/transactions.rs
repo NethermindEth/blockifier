@@ -60,13 +60,25 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
         let execution_result = match program_cache {
             Some(program_cache) => {
                 println!("Using cache of size {}", program_cache.len());
-                self.execute_raw(&mut transactional_state, block_context, charge_fee, validate, Some(program_cache))
+                self.execute_raw(
+                    &mut transactional_state,
+                    block_context,
+                    charge_fee,
+                    validate,
+                    Some(program_cache),
+                )
             }
             None => {
                 println!("Creating cache");
                 let program_cache = get_native_aot_program_cache();
                 let program_cache = &mut (*program_cache.borrow_mut());
-                let result = self.execute_raw(&mut transactional_state, block_context, charge_fee, validate, Some(program_cache));
+                let result = self.execute_raw(
+                    &mut transactional_state,
+                    block_context,
+                    charge_fee,
+                    validate,
+                    Some(program_cache),
+                );
                 result
             }
         };
@@ -326,7 +338,7 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
             ctor_context,
             self.constructor_calldata(),
             *remaining_gas,
-            program_cache
+            program_cache,
         )?;
         update_remaining_gas(remaining_gas, &call_info);
 
@@ -406,7 +418,10 @@ impl<S: State> Executable<S> for InvokeTransaction {
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
-        println!("Run_execute for InvokeTransaction with caller address: {}", self.tx.sender_address().to_string());
+        println!(
+            "Run_execute for InvokeTransaction with caller address: {}",
+            self.tx.sender_address().to_string()
+        );
         let entry_point_selector = match &self.tx {
             starknet_api::transaction::InvokeTransaction::V0(tx) => tx.entry_point_selector,
             starknet_api::transaction::InvokeTransaction::V1(_)
@@ -428,14 +443,15 @@ impl<S: State> Executable<S> for InvokeTransaction {
             initial_gas: *remaining_gas,
         };
 
-        let call_info = execute_call.execute(state, resources, context, program_cache).map_err(|error| {
-            TransactionExecutionError::ExecutionError {
-                error,
-                class_hash,
-                storage_address,
-                selector: entry_point_selector,
-            }
-        })?;
+        let call_info =
+            execute_call.execute(state, resources, context, program_cache).map_err(|error| {
+                TransactionExecutionError::ExecutionError {
+                    error,
+                    class_hash,
+                    storage_address,
+                    selector: entry_point_selector,
+                }
+            })?;
         update_remaining_gas(remaining_gas, &call_info);
 
         Ok(Some(call_info))

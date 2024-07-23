@@ -522,7 +522,7 @@ pub fn deploy_contract(
         ctor_context,
         wrapper_calldata,
         u64::MAX,
-        None
+        None,
     )
     .map_err(|err| {
         println!("Real error: {:?}", err);
