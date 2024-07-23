@@ -1092,7 +1092,7 @@ Execution failed. Failure reason: 0x496e76616c6964207363656e6172696f ('Invalid s
     let re = Regex::new(r"pc=0:[0-9]+").unwrap();
     let cleaned_expected_error = &re.replace_all(&expected_error, "pc=0:*");
     let actual_error =
-        account_tx.execute(state, block_context, true, true, None, None).unwrap_err();
+        account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
     let actual_error_str = actual_error.to_string();
     let cleaned_actual_error = &re.replace_all(&actual_error_str, "pc=0:*");
     // Compare actual trace to the expected trace (sans pc locations).

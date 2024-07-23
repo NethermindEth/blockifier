@@ -109,7 +109,7 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         _charge_fee: bool,
         _validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        tx_hash: Option<TransactionHash>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
 
@@ -122,12 +122,12 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
             &mut context,
             &mut remaining_gas,
             program_cache,
+            mock_resources,
         )?;
         let l1_handler_payload_size = self.payload_size();
 
-        if let Some(tx_hash) = tx_hash {
-            let resources = get_execution_resources(tx_hash);
-            execution_resources = resources;
+        if mock_resources {
+            execution_resources = get_execution_resources(self.tx_hash);
         }
 
         let TransactionReceipt { fee: actual_fee, da_gas, resources: actual_resources, .. } =
@@ -166,7 +166,7 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        tx_hash: Option<TransactionHash>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         match self {
             Self::AccountTransaction(account_tx) => account_tx.execute_raw(
@@ -175,11 +175,16 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
                 charge_fee,
                 validate,
                 program_cache,
-                tx_hash,
+                mock_resources,
             ),
-            Self::L1HandlerTransaction(tx) => {
-                tx.execute_raw(state, block_context, charge_fee, validate, program_cache, tx_hash)
-            }
+            Self::L1HandlerTransaction(tx) => tx.execute_raw(
+                state,
+                block_context,
+                charge_fee,
+                validate,
+                program_cache,
+                mock_resources,
+            ),
         }
     }
 }

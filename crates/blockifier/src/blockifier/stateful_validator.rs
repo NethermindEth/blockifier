@@ -64,12 +64,13 @@ impl<S: StateReader> StatefulValidator<S> {
         tx: AccountTransaction,
         deploy_account_tx_hash: Option<TransactionHash>,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> StatefulValidatorResult<()> {
         // Deploy account transactions should be fully executed, since the constructor must run
         // before `__validate_deploy__`. The execution already includes all necessary validations,
         // so they are skipped here.
         if let AccountTransaction::DeployAccount(_) = tx {
-            self.execute(tx, program_cache)?;
+            self.execute(tx, program_cache, mock_resources)?;
             return Ok(());
         }
 
@@ -102,8 +103,14 @@ impl<S: StateReader> StatefulValidator<S> {
         &mut self,
         tx: AccountTransaction,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> StatefulValidatorResult<()> {
-        self.tx_executor.execute(&Transaction::AccountTransaction(tx), true, program_cache)?;
+        self.tx_executor.execute(
+            &Transaction::AccountTransaction(tx),
+            true,
+            program_cache,
+            mock_resources,
+        )?;
         Ok(())
     }
 

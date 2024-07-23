@@ -55,7 +55,7 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        tx_hash: Option<TransactionHash>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         log::debug!("Executing Transaction...");
         let mut transactional_state = CachedState::create_transactional(state);
@@ -70,7 +70,7 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
             charge_fee,
             validate,
             Some(program_cache),
-            tx_hash,
+            mock_resources,
         );
 
         match execution_result {
@@ -98,7 +98,7 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        tx_hash: Option<TransactionHash>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo>;
 }
 
@@ -110,6 +110,7 @@ pub trait Executable<S: State> {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>>;
 }
 
@@ -190,6 +191,7 @@ impl<S: State> Executable<S> for DeclareTransaction {
         _context: &mut EntryPointExecutionContext,
         _remaining_gas: &mut u64,
         _program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        _mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let class_hash = self.class_hash();
 
@@ -314,6 +316,7 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let class_hash = self.class_hash();
         let ctor_context = ConstructorContext {
@@ -333,7 +336,9 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
         )?;
         update_remaining_gas(remaining_gas, &call_info);
 
-        call_info.resources = get_execution_resources(self.tx_hash);
+        if mock_resources {
+            call_info.resources = get_execution_resources(self.tx_hash);
+        }
 
         Ok(Some(call_info))
     }
@@ -410,6 +415,7 @@ impl<S: State> Executable<S> for InvokeTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let entry_point_selector = match &self.tx {
             starknet_api::transaction::InvokeTransaction::V0(tx) => tx.entry_point_selector,
@@ -442,7 +448,9 @@ impl<S: State> Executable<S> for InvokeTransaction {
             })?;
         update_remaining_gas(remaining_gas, &call_info);
 
-        call_info.resources = get_execution_resources(self.tx_hash);
+        if mock_resources {
+            call_info.resources = get_execution_resources(self.tx_hash);
+        }
 
         Ok(Some(call_info))
     }
@@ -536,6 +544,7 @@ impl<S: State> Executable<S> for L1HandlerTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let tx = &self.tx;
         let storage_address = tx.contract_address;
@@ -564,7 +573,9 @@ impl<S: State> Executable<S> for L1HandlerTransaction {
             })
             .map(|e| {
                 e.map(|mut call_info| {
-                    call_info.resources = get_execution_resources(self.tx_hash);
+                    if mock_resources {
+                        call_info.resources = get_execution_resources(self.tx_hash);
+                    }
                     call_info
                 })
             })

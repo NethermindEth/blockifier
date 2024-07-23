@@ -17,7 +17,7 @@ use crate::state::errors::StateError;
 use crate::state::state_api::{State, StateReader};
 use crate::transaction::account_transaction::AccountTransaction;
 use crate::transaction::errors::TransactionExecutionError;
-use crate::transaction::objects::{TransactionExecutionInfo, TransactionInfoCreator};
+use crate::transaction::objects::TransactionExecutionInfo;
 use crate::transaction::transaction_execution::Transaction;
 use crate::transaction::transactions::{ExecutableTransaction, ValidatableTransaction};
 
@@ -74,6 +74,7 @@ impl<S: StateReader> TransactionExecutor<S> {
         tx: &Transaction,
         charge_fee: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> TransactionExecutorResult<TransactionExecutionInfo> {
         let mut transactional_state = CachedState::create_transactional(&mut self.state);
         let validate = true;
@@ -84,7 +85,7 @@ impl<S: StateReader> TransactionExecutor<S> {
             charge_fee,
             validate,
             program_cache,
-            Some(tx.create_tx_info().transaction_hash()),
+            mock_resources,
         );
         match tx_execution_result {
             Ok(tx_execution_info) => {
@@ -111,9 +112,10 @@ impl<S: StateReader> TransactionExecutor<S> {
         txs: &[Transaction],
         charge_fee: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> Vec<TransactionExecutorResult<TransactionExecutionInfo>> {
         if !self.config.concurrency_config.enabled {
-            self.execute_txs_sequentially(txs, charge_fee, program_cache)
+            self.execute_txs_sequentially(txs, charge_fee, program_cache, mock_resources)
         } else {
             txs.chunks(self.config.concurrency_config.chunk_size)
                 .fold_while(Vec::new(), |mut results, chunk| {
@@ -144,12 +146,15 @@ impl<S: StateReader> TransactionExecutor<S> {
         txs: &[Transaction],
         charge_fee: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
+        mock_resources: bool,
     ) -> Vec<TransactionExecutorResult<TransactionExecutionInfo>> {
         let mut results_to_return = Vec::new();
         let results = if let Some(cache) = program_cache {
-            txs.iter().map(|tx| self.execute(tx, charge_fee, Some(cache))).collect_vec()
+            txs.iter()
+                .map(|tx| self.execute(tx, charge_fee, Some(cache), mock_resources))
+                .collect_vec()
         } else {
-            txs.iter().map(|tx| self.execute(tx, charge_fee, None)).collect_vec()
+            txs.iter().map(|tx| self.execute(tx, charge_fee, None, mock_resources)).collect_vec()
         };
 
         for result in results {
