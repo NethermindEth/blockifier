@@ -34,7 +34,7 @@ use starknet_api::deprecated_contract_class::{
 
 use super::execution_utils::poseidon_hash_many_cost;
 use super::native::utils::{
-    contract_entrypoint_to_entrypoint_selector, get_native_aot_program_cache_aot,
+    contract_entrypoint_to_entrypoint_selector, get_native_aot_program_cache,
 };
 use crate::abi::abi_utils::selector_from_name;
 use crate::abi::constants::{self, CONSTRUCTOR_ENTRY_POINT_NAME};
@@ -550,13 +550,30 @@ impl SierraContractClassV1 {
         Some(contract_entrypoint_to_entrypoint_selector(entrypoint))
     }
 
-    pub fn try_from_json_string(
-        raw_contract_class: &str,
-    ) -> Result<SierraContractClassV1, ProgramError> {
-        let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
-        let contract_class: SierraContractClassV1 = sierra_contract_class.try_into()?;
+    ///
+    fn compile(sierra_program: SierraProgram) -> Arc<AotNativeExecutor> {
+        // We are only interested in the SierraContract and not the program cache therefore we supply
+        // a default key.
+        let mut program_cache = get_native_aot_program_cache();
+        program_cache.compile_and_insert(Default::default(), &sierra_program, OptLevel::Default)
+    }
 
-        Ok(contract_class)
+    pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
+        let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
+        // todo(rodro): we are having two instances of a sierra program, one it's object form
+        // and another in its felt encoded form. This can be avoided by either:
+        //   1. Having access to the encoding/decoding functions
+        //   2. Refactoring the code on the Cairo mono-repo
+
+        let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
+        let executor = Self::compile(sierra_program);
+
+        Ok(Self(Arc::new(SierraContractClassV1Inner {
+            sierra_program: sierra_contract_class.extract_sierra_program().unwrap(),
+            entry_points_by_type: sierra_contract_class.entry_points_by_type,
+            sierra_program_raw: sierra_contract_class.sierra_program,
+            executor,
+        })))
     }
 
     pub fn to_casm_contract_class(
@@ -575,40 +592,13 @@ impl SierraContractClassV1 {
     }
 }
 
-impl TryFrom<SierraContractClass> for SierraContractClassV1 {
-    // TODO error type
-    type Error = ProgramError;
-
-    fn try_from(class: SierraContractClass) -> Result<Self, Self::Error> {
-        // todo(rodro): we are having two instances of a sierra program, one it's object form
-        // and another in its felt encoded form. This can be avoided by either:
-        //   1. Having access to the encoding/decoding functions
-        //   2. Refactoring the code on the Cairo mono-repo
-
-        let sierra_program = class.extract_sierra_program().unwrap();
-        let mut program_cache = get_native_aot_program_cache_aot();
-
-        // Todo rewrite compile and insert such that it doesn't need
-        let executor = program_cache.compile_and_insert(
-            Default::default(),
-            &sierra_program,
-            OptLevel::Default,
-        );
-
-        Ok(Self(Arc::new(SierraContractClassV1Inner {
-            sierra_program: class.extract_sierra_program().unwrap(),
-            entry_points_by_type: class.entry_points_by_type,
-            sierra_program_raw: class.sierra_program,
-            executor,
-        })))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SierraContractClassV1Inner {
     sierra_program: SierraProgram,
     pub entry_points_by_type: SierraContractEntryPoints,
     sierra_program_raw: Vec<BigUintAsHex>,
+    // Throughout the code base ContractClasses are cloned a lot
+    // therefore we put the NativeExecutor in an Arc.
     pub executor: Arc<AotNativeExecutor>,
 }
 

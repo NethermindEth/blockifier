@@ -5,7 +5,7 @@ use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
-use cairo_native::cache::{AotProgramCache, JitProgramCache, ProgramCache};
+use cairo_native::cache::{AotProgramCache, ProgramCache};
 use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::NativeExecutor;
@@ -72,16 +72,8 @@ pub fn match_entrypoint(
 static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
     std::sync::OnceLock::new();
 
-pub fn get_native_aot_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
-    ProgramCache::Aot(AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
-}
-
-pub fn get_native_aot_program_cache_aot<'context>() -> AotProgramCache<'context, ClassHash> {
+pub fn get_native_aot_program_cache<'context>() -> AotProgramCache<'context, ClassHash> {
     AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new))
-}
-
-pub fn get_native_jit_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
-    ProgramCache::Jit(JitProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
 pub fn get_native_executor<'context>(
