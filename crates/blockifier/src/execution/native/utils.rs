@@ -1,10 +1,7 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::RandomState;
-use std::rc::Rc;
 
-use ark_ec::short_weierstrass::SWCurveConfig;
-use ark_ff::{BigInt, PrimeField};
+use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
@@ -32,8 +29,7 @@ use crate::execution::call_info::{
 use crate::execution::entry_point::{CallEntryPoint, EntryPointExecutionResult};
 use crate::execution::errors::EntryPointExecutionError;
 use crate::execution::native::syscall_handler::NativeSyscallHandler;
-use crate::execution::syscalls::hint_processor::{SyscallExecutionError, L1_GAS, L2_GAS};
-use crate::execution::syscalls::secp::{SecpHintProcessor, SecpNewRequest, SecpNewResponse};
+use crate::execution::syscalls::hint_processor::{L1_GAS, L2_GAS};
 use crate::transaction::objects::CurrentTransactionInfo;
 #[cfg(test)]
 #[path = "utils_test.rs"]
@@ -76,38 +72,44 @@ pub fn match_entrypoint(
 static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
     std::sync::OnceLock::new();
 
-pub fn get_native_aot_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
-    Rc::new(RefCell::new(ProgramCache::Aot(AotProgramCache::new(
-        NATIVE_CONTEXT.get_or_init(NativeContext::new),
-    ))))
+pub fn get_native_aot_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
+    ProgramCache::Aot(AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
-pub fn get_native_jit_program_cache<'context>() -> Rc<RefCell<ProgramCache<'context, ClassHash>>> {
-    Rc::new(RefCell::new(ProgramCache::Jit(JitProgramCache::new(
-        NATIVE_CONTEXT.get_or_init(NativeContext::new),
-    ))))
+pub fn get_native_jit_program_cache<'context>() -> ProgramCache<'context, ClassHash> {
+    ProgramCache::Jit(JitProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new)))
 }
 
 pub fn get_native_executor<'context>(
     class_hash: ClassHash,
     program: &SierraProgram,
-    program_cache: Rc<RefCell<ProgramCache<'context, ClassHash>>>,
+    program_cache: &mut ProgramCache<'context, ClassHash>,
 ) -> NativeExecutor<'context> {
-    let program_cache = &mut (*program_cache.borrow_mut());
-
     match program_cache {
         ProgramCache::Aot(cache) => {
             let cached_executor = cache.get(&class_hash);
             NativeExecutor::Aot(match cached_executor {
-                Some(executor) => executor,
-                None => cache.compile_and_insert(class_hash, program, OptLevel::Default),
+                Some(executor) => {
+                    println!("AOT Cache Hit");
+                    executor
+                }
+                None => {
+                    println!("AOT Cache Miss");
+                    cache.compile_and_insert(class_hash, program, OptLevel::Default)
+                }
             })
         }
         ProgramCache::Jit(cache) => {
             let cached_executor = cache.get(&class_hash);
             NativeExecutor::Jit(match cached_executor {
-                Some(executor) => executor,
-                None => cache.compile_and_insert(class_hash, program, OptLevel::Default),
+                Some(executor) => {
+                    println!("JIT Cache Hit");
+                    executor
+                }
+                None => {
+                    println!("JIT Cache Miss");
+                    cache.compile_and_insert(class_hash, program, OptLevel::Default)
+                }
             })
         }
     }
@@ -148,7 +150,7 @@ pub fn run_native_executor(
     native_executor: NativeExecutor<'_>,
     sierra_entry_function_id: &FunctionId,
     call: CallEntryPoint,
-    mut syscall_handler: NativeSyscallHandler<'_>,
+    mut syscall_handler: NativeSyscallHandler<'_, '_>,
 ) -> EntryPointExecutionResult<CallInfo> {
     let stark_felts_to_native_felts = |data: &[StarkFelt]| -> Vec<Felt> {
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
@@ -225,7 +227,7 @@ pub fn u256_to_biguint(u256: U256) -> BigUint {
     let lo = BigUint::from(u256.lo);
     let hi = BigUint::from(u256.hi);
 
-    hi + (lo << 128) // 128 is the size of lo
+    (hi << 128) + lo
 }
 
 pub fn big4int_to_u256(b_int: BigInt<4>) -> U256 {
@@ -266,30 +268,6 @@ pub fn decode_felts_as_str(encoding: &[Felt]) -> String {
                 .join(", ");
             format!("[{}]", err_msgs)
         }
-    }
-}
-
-pub fn allocate_point<Curve: SWCurveConfig>(
-    point_x: U256,
-    point_y: U256,
-    hint_processor: &mut SecpHintProcessor<Curve>,
-) -> SyscallResult<usize>
-where
-    Curve::BaseField: PrimeField,
-{
-    let request = SecpNewRequest { x: u256_to_biguint(point_x), y: u256_to_biguint(point_y) };
-
-    let response = hint_processor.secp_new_unchecked(request);
-
-    match response {
-        // We can't receive None here, as the response is always Some from `secp_new_unchecked`.
-        Ok(SecpNewResponse { optional_ec_point_id: id }) => Ok(id.unwrap()),
-        Err(SyscallExecutionError::SyscallError { error_data }) => {
-            Err(error_data.iter().map(|felt| stark_felt_to_native_felt(*felt)).collect())
-        }
-        Err(_) => unreachable!(
-            "Can't receive an error other than SyscallError from `secp_new_unchecked`."
-        ),
     }
 }
 

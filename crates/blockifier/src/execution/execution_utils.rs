@@ -3,6 +3,7 @@ use std::env;
 
 use cairo_felt::Felt252;
 use cairo_lang_runner::casm_run::format_next_item;
+use cairo_native::cache::ProgramCache;
 use cairo_vm::serde::deserialize_program::{
     deserialize_array_of_bigint_hex, Attribute, HintParams, Identifier, ReferenceManager,
 };
@@ -32,8 +33,9 @@ use crate::execution::entry_point::{
 use crate::execution::errors::PostExecutionError;
 use crate::execution::native::entry_point_execution as native_entry_point_execution;
 use crate::execution::{deprecated_entry_point_execution, entry_point_execution};
+use crate::state::cached_state::CachedState;
 use crate::state::errors::StateError;
-use crate::state::state_api::State;
+use crate::state::state_api::{DynStateWrapper, State};
 use crate::transaction::objects::TransactionInfo;
 
 pub type Args = Vec<CairoArg>;
@@ -58,6 +60,7 @@ pub fn execute_entry_point_call(
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
+    program_cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     match contract_class {
         ContractClass::V0(contract_class) => {
@@ -67,6 +70,7 @@ pub fn execute_entry_point_call(
                 state,
                 resources,
                 context,
+                program_cache,
             )
         }
         ContractClass::V1(contract_class) => entry_point_execution::execute_entry_point_call(
@@ -77,16 +81,27 @@ pub fn execute_entry_point_call(
             context,
         ),
         ContractClass::V1Sierra(contract_class) => {
+            let state_wrapped = DynStateWrapper { state };
+
+            let mut cached_state = CachedState::new(state_wrapped);
+
+            let mut transactional = CachedState::create_transactional(&mut cached_state);
+
             let fallback = env::var("FALLBACK_ENABLED").unwrap_or(String::from("0")) == "1";
             match native_entry_point_execution::execute_entry_point_call(
                 call.clone(),
                 contract_class.clone(),
-                state,
+                &mut transactional,
                 resources,
                 context,
+                program_cache,
             ) {
-                Ok(res) => Ok(res),
+                Ok(res) => {
+                    transactional.commit();
+                    Ok(res)
+                }
                 Err(EntryPointExecutionError::NativeUnexpectedError { .. }) if fallback => {
+                    transactional.abort();
                     // Fallback to VM execution in case of an Error
                     let casm_contract_class =
                         contract_class.to_casm_contract_class().map_err(|e| {
@@ -97,7 +112,7 @@ pub fn execute_entry_point_call(
                     entry_point_execution::execute_entry_point_call(
                         call,
                         contract_class_v1,
-                        state,
+                        &mut cached_state,
                         resources,
                         context,
                     )
@@ -258,6 +273,7 @@ pub fn execute_deployment(
     ctor_context: ConstructorContext,
     constructor_calldata: Calldata,
     remaining_gas: u64,
+    program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
 ) -> ConstructorEntryPointExecutionResult<CallInfo> {
     // Address allocation in the state is done before calling the constructor, so that it is
     // visible from it.
@@ -285,6 +301,7 @@ pub fn execute_deployment(
         ctor_context,
         constructor_calldata,
         remaining_gas,
+        program_cache,
     )
 }
 

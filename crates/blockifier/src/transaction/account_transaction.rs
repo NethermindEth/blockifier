@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use starknet_api::calldata;
-use starknet_api::core::{ContractAddress, EntryPointSelector};
+use starknet_api::core::{ClassHash, ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::transaction::{Calldata, Fee, ResourceBounds, TransactionVersion};
@@ -256,6 +257,7 @@ impl AccountTransaction {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn handle_validate_tx(
         &self,
         state: &mut dyn State,
@@ -264,9 +266,17 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         limit_steps_by_resources: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         if validate {
-            self.validate_tx(state, resources, tx_context, remaining_gas, limit_steps_by_resources)
+            self.validate_tx(
+                state,
+                resources,
+                tx_context,
+                remaining_gas,
+                limit_steps_by_resources,
+                program_cache,
+            )
         } else {
             Ok(None)
         }
@@ -308,6 +318,7 @@ impl AccountTransaction {
         tx_context: Arc<TransactionContext>,
         actual_fee: Fee,
         charge_fee: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         if !charge_fee || actual_fee == Fee(0) {
             // Fee charging is not enforced in some transaction simulations and tests.
@@ -323,7 +334,7 @@ impl AccountTransaction {
         {
             Self::concurrency_execute_fee_transfer(state, tx_context, actual_fee)?
         } else {
-            Self::execute_fee_transfer(state, tx_context, actual_fee)?
+            Self::execute_fee_transfer(state, tx_context, actual_fee, program_cache)?
         };
 
         Ok(Some(fee_transfer_call_info))
@@ -333,6 +344,7 @@ impl AccountTransaction {
         state: &mut dyn State,
         tx_context: Arc<TransactionContext>,
         actual_fee: Fee,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<CallInfo> {
         // The least significant 128 bits of the amount transferred.
         let lsb_amount = StarkFelt::from(actual_fee.0);
@@ -361,7 +373,7 @@ impl AccountTransaction {
         let mut context = EntryPointExecutionContext::new_invoke(tx_context, true)?;
 
         Ok(fee_transfer_call
-            .execute(state, &mut ExecutionResources::default(), &mut context)
+            .execute(state, &mut ExecutionResources::default(), &mut context, program_cache)
             .map_err(TransactionFeeError::ExecuteFeeTransferError)?)
     }
 
@@ -376,6 +388,7 @@ impl AccountTransaction {
         tx_context: Arc<TransactionContext>,
         actual_fee: Fee,
     ) -> TransactionExecutionResult<CallInfo> {
+        println!("Concurrency execute fee transfer");
         let TransactionContext { block_context, tx_info } = tx_context.as_ref();
         let fee_address = block_context.chain_info.fee_token_address(&tx_info.fee_type());
         let sequencer_address = block_context.block_info.sequencer_address;
@@ -390,8 +403,12 @@ impl AccountTransaction {
             cache.set_storage_initial_value(fee_address, key, StarkFelt::ZERO);
         }
 
-        let fee_transfer_call_info =
-            AccountTransaction::execute_fee_transfer(&mut transfer_state, tx_context, actual_fee);
+        let fee_transfer_call_info = AccountTransaction::execute_fee_transfer(
+            &mut transfer_state,
+            tx_context,
+            actual_fee,
+            None,
+        );
         // Commit without updating the sequencer balance.
         let storage_writes = &mut transfer_state.cache.get_mut().writes.storage;
         storage_writes.remove(&(fee_address, sequencer_balance_key_low));
@@ -406,11 +423,18 @@ impl AccountTransaction {
         resources: &mut ExecutionResources,
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         match &self {
-            Self::Declare(tx) => tx.run_execute(state, resources, context, remaining_gas),
-            Self::DeployAccount(tx) => tx.run_execute(state, resources, context, remaining_gas),
-            Self::Invoke(tx) => tx.run_execute(state, resources, context, remaining_gas),
+            Self::Declare(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
+            Self::DeployAccount(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
+            Self::Invoke(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
         }
     }
 
@@ -421,18 +445,26 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         charge_fee: bool,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
+        println!("AccountTransaction::run_non_revertible");
         let mut resources = ExecutionResources::default();
         let validate_call_info: Option<CallInfo>;
         let execute_call_info: Option<CallInfo>;
+
         if matches!(self, Self::DeployAccount(_)) {
             // Handle `DeployAccount` transactions separately, due to different order of things.
             // Also, the execution context required form the `DeployAccount` execute phase is
             // validation context.
             let mut execution_context =
                 EntryPointExecutionContext::new_validate(tx_context.clone(), charge_fee)?;
-            execute_call_info =
-                self.run_execute(state, &mut resources, &mut execution_context, remaining_gas)?;
+            execute_call_info = self.run_execute(
+                state,
+                &mut resources,
+                &mut execution_context,
+                remaining_gas,
+                program_cache.as_deref_mut(),
+            )?;
             validate_call_info = self.handle_validate_tx(
                 state,
                 &mut resources,
@@ -440,6 +472,7 @@ impl AccountTransaction {
                 remaining_gas,
                 validate,
                 charge_fee,
+                program_cache,
             )?;
         } else {
             let mut execution_context =
@@ -451,9 +484,15 @@ impl AccountTransaction {
                 remaining_gas,
                 validate,
                 charge_fee,
+                program_cache.as_deref_mut(),
             )?;
-            execute_call_info =
-                self.run_execute(state, &mut resources, &mut execution_context, remaining_gas)?;
+            execute_call_info = self.run_execute(
+                state,
+                &mut resources,
+                &mut execution_context,
+                remaining_gas,
+                program_cache,
+            )?;
         }
 
         let tx_receipt = TransactionReceipt::from_account_tx(
@@ -484,6 +523,7 @@ impl AccountTransaction {
         remaining_gas: &mut u64,
         validate: bool,
         charge_fee: bool,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         let mut resources = ExecutionResources::default();
         let mut execution_context =
@@ -496,6 +536,7 @@ impl AccountTransaction {
             remaining_gas,
             validate,
             charge_fee,
+            program_cache.as_deref_mut(),
         )?;
 
         let n_allotted_execution_steps = execution_context.subtract_validation_and_overhead_steps(
@@ -518,6 +559,7 @@ impl AccountTransaction {
             &mut execution_resources,
             &mut execution_context,
             remaining_gas,
+            program_cache,
         );
 
         // Pre-compute cost in case of revert.
@@ -625,12 +667,20 @@ impl AccountTransaction {
         tx_context: Arc<TransactionContext>,
         validate: bool,
         charge_fee: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         if self.is_non_revertible(&tx_context.tx_info) {
-            return self.run_non_revertible(state, tx_context, remaining_gas, validate, charge_fee);
+            return self.run_non_revertible(
+                state,
+                tx_context,
+                remaining_gas,
+                validate,
+                charge_fee,
+                program_cache,
+            );
         }
 
-        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee)
+        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee, program_cache)
     }
 }
 
@@ -641,6 +691,7 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
         block_context: &BlockContext,
         charge_fee: bool,
         validate: bool,
+        mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
         self.verify_tx_version(tx_context.tx_info.version())?;
@@ -668,8 +719,10 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             tx_context.clone(),
             validate,
             charge_fee,
+            program_cache.as_deref_mut(),
         )?;
-        let fee_transfer_call_info = self.handle_fee(state, tx_context, final_fee, charge_fee)?;
+        let fee_transfer_call_info =
+            self.handle_fee(state, tx_context, final_fee, charge_fee, program_cache)?;
 
         let tx_execution_info = TransactionExecutionInfo {
             validate_call_info,
@@ -733,6 +786,7 @@ impl ValidatableTransaction for AccountTransaction {
         tx_context: Arc<TransactionContext>,
         remaining_gas: &mut u64,
         limit_steps_by_resources: bool,
+        program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let mut context =
             EntryPointExecutionContext::new_validate(tx_context, limit_steps_by_resources)?;
@@ -756,14 +810,13 @@ impl ValidatableTransaction for AccountTransaction {
             initial_gas: *remaining_gas,
         };
 
-        let validate_call_info =
-            validate_call.execute(state, resources, &mut context).map_err(|error| {
-                TransactionExecutionError::ValidateTransactionError {
-                    error,
-                    class_hash,
-                    storage_address,
-                    selector: validate_selector,
-                }
+        let validate_call_info = validate_call
+            .execute(state, resources, &mut context, program_cache)
+            .map_err(|error| TransactionExecutionError::ValidateTransactionError {
+                error,
+                class_hash,
+                storage_address,
+                selector: validate_selector,
             })?;
 
         // Validate return data.
