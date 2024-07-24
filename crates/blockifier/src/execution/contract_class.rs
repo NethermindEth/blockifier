@@ -550,15 +550,15 @@ impl SierraContractClassV1 {
         Some(contract_entrypoint_to_entrypoint_selector(entrypoint))
     }
 
-    ///
-    fn compile(sierra_program: SierraProgram) -> Arc<AotNativeExecutor> {
-        // We are only interested in the SierraContract and not the program cache therefore we supply
-        // a default key.
-        let mut program_cache = get_native_aot_program_cache();
-        program_cache.compile_and_insert(Default::default(), &sierra_program, OptLevel::Default)
-    }
-
     pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
+        fn compile(sierra_program: SierraProgram) -> Arc<AotNativeExecutor> {
+            // todo(xrvdg) rewrite this compile function after profiling.
+            // We care about the result of the compilation and not about the program cache
+            // therefore we supply an empty cache and an arbitrary key.
+            let mut program_cache = get_native_aot_program_cache();
+            program_cache.compile_and_insert(Default::default(), &sierra_program, OptLevel::Default)
+        }
+
         let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
         // todo(rodro): we are having two instances of a sierra program, one it's object form
         // and another in its felt encoded form. This can be avoided by either:
@@ -566,7 +566,7 @@ impl SierraContractClassV1 {
         //   2. Refactoring the code on the Cairo mono-repo
 
         let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
-        let executor = Self::compile(sierra_program);
+        let executor = compile(sierra_program);
 
         Ok(Self(Arc::new(SierraContractClassV1Inner {
             sierra_program: sierra_contract_class.extract_sierra_program().unwrap(),
@@ -594,7 +594,11 @@ impl SierraContractClassV1 {
 
 #[derive(Clone, Debug)]
 pub struct SierraContractClassV1Inner {
-    sierra_program: SierraProgram,
+    // todo(xrvdg) can we make sierra_program private such that it
+    // is only available for debugging purposes?
+    // For now execute_entry_point_call needs it
+    // to get the entry function
+    pub sierra_program: SierraProgram,
     pub entry_points_by_type: SierraContractEntryPoints,
     sierra_program_raw: Vec<BigUintAsHex>,
     // Throughout the code base ContractClasses are cloned a lot
@@ -602,16 +606,7 @@ pub struct SierraContractClassV1Inner {
     pub executor: Arc<AotNativeExecutor>,
 }
 
-// Eventually we want SierraProgram to be gone or not accessible
-// therefore we first remove the public definition and require the use
-// of a getter.
-impl SierraContractClassV1Inner {
-    pub fn sierra_program(&self) -> &SierraProgram {
-        &self.sierra_program
-    }
-}
-
-// todo(xrvdg) do we want to compare executors?
+// Manual implementation as the executor has no comparison
 impl PartialEq for SierraContractClassV1Inner {
     fn eq(&self, other: &Self) -> bool {
         self.sierra_program == other.sierra_program

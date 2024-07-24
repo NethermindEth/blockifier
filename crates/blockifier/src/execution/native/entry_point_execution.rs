@@ -19,7 +19,7 @@ pub fn execute_entry_point_call(
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
 ) -> EntryPointExecutionResult<CallInfo> {
-    let sierra_program: &SierraProgram = &contract_class.sierra_program();
+    let sierra_program: &SierraProgram = &contract_class.sierra_program;
     let contract_entrypoints: &ContractEntryPoints = &contract_class.entry_points_by_type;
 
     let matching_entrypoint =
