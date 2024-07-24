@@ -108,3 +108,84 @@ pub trait State: StateReader {
     //   entry points do not affect the final set of PCs.
     fn add_visited_pcs(&mut self, class_hash: ClassHash, pcs: &HashSet<usize>);
 }
+
+pub struct DynStateWrapper<'a> {
+    pub state: &'a mut dyn State,
+}
+
+impl StateReader for DynStateWrapper<'_> {
+    fn get_storage_at(
+        &self,
+        contract_address: ContractAddress,
+        key: StorageKey,
+    ) -> StateResult<StarkFelt> {
+        self.state.get_storage_at(contract_address, key)
+    }
+
+    fn get_nonce_at(&self, contract_address: ContractAddress) -> StateResult<Nonce> {
+        self.state.get_nonce_at(contract_address)
+    }
+
+    fn get_class_hash_at(&self, contract_address: ContractAddress) -> StateResult<ClassHash> {
+        self.state.get_class_hash_at(contract_address)
+    }
+
+    fn get_compiled_contract_class(&self, class_hash: ClassHash) -> StateResult<ContractClass> {
+        self.state.get_compiled_contract_class(class_hash)
+    }
+
+    fn get_compiled_class_hash(&self, class_hash: ClassHash) -> StateResult<CompiledClassHash> {
+        self.state.get_compiled_class_hash(class_hash)
+    }
+
+    fn get_fee_token_balance(
+        &mut self,
+        contract_address: ContractAddress,
+        fee_token_address: ContractAddress,
+    ) -> Result<(StarkFelt, StarkFelt), StateError> {
+        self.state.get_fee_token_balance(contract_address, fee_token_address)
+    }
+}
+
+impl State for DynStateWrapper<'_> {
+    fn set_storage_at(
+        &mut self,
+        contract_address: ContractAddress,
+        key: StorageKey,
+        value: StarkFelt,
+    ) -> StateResult<()> {
+        self.state.set_storage_at(contract_address, key, value)
+    }
+
+    fn increment_nonce(&mut self, contract_address: ContractAddress) -> StateResult<()> {
+        self.state.increment_nonce(contract_address)
+    }
+
+    fn set_class_hash_at(
+        &mut self,
+        contract_address: ContractAddress,
+        class_hash: ClassHash,
+    ) -> StateResult<()> {
+        self.state.set_class_hash_at(contract_address, class_hash)
+    }
+
+    fn set_contract_class(
+        &mut self,
+        class_hash: ClassHash,
+        contract_class: ContractClass,
+    ) -> StateResult<()> {
+        self.state.set_contract_class(class_hash, contract_class)
+    }
+
+    fn set_compiled_class_hash(
+        &mut self,
+        class_hash: ClassHash,
+        compiled_class_hash: CompiledClassHash,
+    ) -> StateResult<()> {
+        self.state.set_compiled_class_hash(class_hash, compiled_class_hash)
+    }
+
+    fn add_visited_pcs(&mut self, class_hash: ClassHash, pcs: &HashSet<usize>) {
+        self.state.add_visited_pcs(class_hash, pcs)
+    }
+}
