@@ -296,11 +296,9 @@ fn test_revert_on_resource_overuse(
 
     // Assert the transaction was reverted with the correct error.
     if is_revertible {
-        assert!(execution_info_result
-            .unwrap()
-            .revert_error
-            .unwrap()
-            .starts_with(expected_error_prefix));
+        assert!(
+            execution_info_result.unwrap().revert_error.unwrap().starts_with(expected_error_prefix)
+        );
     } else {
         assert_matches!(
             execution_info_result.unwrap_err(),

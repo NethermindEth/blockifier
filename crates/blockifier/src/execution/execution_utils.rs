@@ -328,11 +328,7 @@ pub fn format_panic_data(felts: &[StarkFelt]) -> String {
     while let Some(item) = format_next_item(&mut felts) {
         items.push(item.quote_if_string());
     }
-    if let [item] = &items[..] {
-        item.clone()
-    } else {
-        format!("({})", items.join(", "))
-    }
+    if let [item] = &items[..] { item.clone() } else { format!("({})", items.join(", ")) }
 }
 
 /// Returns the VM resources required for running `poseidon_hash_many` in the Starknet OS.

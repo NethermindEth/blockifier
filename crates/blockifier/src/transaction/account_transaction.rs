@@ -605,11 +605,7 @@ impl AccountTransaction {
     /// Returns 0 on non-declare transactions; for declare transactions, returns the class code
     /// size.
     pub(crate) fn declare_code_size(&self) -> usize {
-        if let Self::Declare(tx) = self {
-            tx.class_info.code_size()
-        } else {
-            0
-        }
+        if let Self::Declare(tx) = self { tx.class_info.code_size() } else { 0 }
     }
 
     fn is_non_revertible(&self, tx_info: &TransactionInfo) -> bool {

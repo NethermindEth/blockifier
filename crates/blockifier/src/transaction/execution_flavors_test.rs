@@ -369,10 +369,9 @@ fn test_simulate_validate_charge_fee_fail_validate(
             actual_fee,
         );
     } else {
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("An ASSERT_EQ instruction failed: 1 != 0."));
+        assert!(
+            result.unwrap_err().to_string().contains("An ASSERT_EQ instruction failed: 1 != 0.")
+        );
     }
 }
 
@@ -674,11 +673,13 @@ fn test_simulate_validate_charge_fee_post_execution(
     .unwrap();
     assert_eq!(tx_execution_info.is_reverted(), charge_fee);
     if charge_fee {
-        assert!(tx_execution_info
-            .revert_error
-            .clone()
-            .unwrap()
-            .contains("Insufficient fee token balance."));
+        assert!(
+            tx_execution_info
+                .revert_error
+                .clone()
+                .unwrap()
+                .contains("Insufficient fee token balance.")
+        );
     }
     check_gas_and_fee(
         &block_context,

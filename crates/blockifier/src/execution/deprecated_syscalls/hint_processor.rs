@@ -402,7 +402,7 @@ impl<'a> DeprecatedSyscallHintProcessor<'a> {
     }
 }
 
-impl<'context> ResourceTracker for DeprecatedSyscallHintProcessor<'_> {
+impl ResourceTracker for DeprecatedSyscallHintProcessor<'_> {
     fn consumed(&self) -> bool {
         self.context.vm_run_resources.consumed()
     }
@@ -420,7 +420,7 @@ impl<'context> ResourceTracker for DeprecatedSyscallHintProcessor<'_> {
     }
 }
 
-impl<'context> HintProcessorLogic for DeprecatedSyscallHintProcessor<'_> {
+impl HintProcessorLogic for DeprecatedSyscallHintProcessor<'_> {
     fn execute_hint(
         &mut self,
         vm: &mut VirtualMachine,

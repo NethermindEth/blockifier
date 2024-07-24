@@ -117,11 +117,7 @@ fn expected_validate_call_info(
             usize::from(entry_point_selector_name == constants::VALIDATE_ENTRY_POINT_NAME)
         }
         CairoVersion::Cairo1 => {
-            if entry_point_selector_name == constants::VALIDATE_ENTRY_POINT_NAME {
-                7
-            } else {
-                2
-            }
+            if entry_point_selector_name == constants::VALIDATE_ENTRY_POINT_NAME { 7 } else { 2 }
         }
     };
     let n_steps = match (entry_point_selector_name, cairo_version) {
@@ -1864,10 +1860,12 @@ fn test_execute_tx_with_invalid_transaction_version(block_context: BlockContext)
     });
 
     let execution_info = account_tx.execute(state, block_context, true, true).unwrap();
-    assert!(execution_info
-        .revert_error
-        .unwrap()
-        .contains(format!("ASSERT_EQ instruction failed: {} != 1.", invalid_version).as_str()));
+    assert!(
+        execution_info
+            .revert_error
+            .unwrap()
+            .contains(format!("ASSERT_EQ instruction failed: {} != 1.", invalid_version).as_str())
+    );
 }
 
 fn max_n_emitted_events() -> usize {
@@ -1930,17 +1928,17 @@ fn test_emit_event_exceeds_limit(
     );
 
     let calldata = [
-        vec![
-            stark_felt!(u16::try_from(n_emitted_events).expect("Failed to convert usize to u16.")),
-        ]
+        vec![stark_felt!(
+            u16::try_from(n_emitted_events).expect("Failed to convert usize to u16.")
+        )]
         .to_owned(),
-        vec![
-            stark_felt!(u16::try_from(event_keys.len()).expect("Failed to convert usize to u16.")),
-        ],
+        vec![stark_felt!(
+            u16::try_from(event_keys.len()).expect("Failed to convert usize to u16.")
+        )],
         event_keys.clone(),
-        vec![
-            stark_felt!(u16::try_from(event_data.len()).expect("Failed to convert usize to u16.")),
-        ],
+        vec![stark_felt!(
+            u16::try_from(event_data.len()).expect("Failed to convert usize to u16.")
+        )],
         event_data.clone(),
     ]
     .concat();
