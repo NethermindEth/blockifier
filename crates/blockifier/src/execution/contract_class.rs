@@ -549,10 +549,10 @@ impl SierraContractClassV1 {
     }
 
     pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
-        fn compile(sierra_program: &SierraProgram) -> Arc<AotNativeExecutor> {
+        fn compile(sierra_program: &SierraProgram) -> AotNativeExecutor {
             let native_context = cairo_native::context::NativeContext::new();
             let native_program = native_context.compile(sierra_program, None).unwrap();
-            Arc::new(AotNativeExecutor::from_native_module(native_program, OptLevel::Default))
+            AotNativeExecutor::from_native_module(native_program, OptLevel::Default)
         }
 
         let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
@@ -588,7 +588,7 @@ impl SierraContractClassV1 {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SierraContractClassV1Inner {
     // todo(xrvdg) can we make sierra_program private such that it
     // is only available for debugging purposes?
@@ -599,7 +599,7 @@ pub struct SierraContractClassV1Inner {
     sierra_program_raw: Vec<BigUintAsHex>,
     // Throughout the code base ContractClasses are cloned a lot
     // therefore we put the NativeExecutor in an Arc.
-    pub executor: Arc<AotNativeExecutor>,
+    pub executor: AotNativeExecutor,
 }
 
 // Manual implementation as the executor has no comparison

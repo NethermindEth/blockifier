@@ -8,7 +8,7 @@ use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEn
 use cairo_native::cache::{AotProgramCache, ProgramCache};
 use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
-use cairo_native::executor::NativeExecutor;
+use cairo_native::executor::{AotNativeExecutor, NativeExecutor};
 use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
 use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
@@ -143,7 +143,7 @@ pub fn contract_entrypoint_to_entrypoint_selector(
 }
 
 pub fn run_native_executor(
-    native_executor: NativeExecutor<'_>,
+    native_executor: &AotNativeExecutor,
     sierra_entry_function_id: &FunctionId,
     call: CallEntryPoint,
     mut syscall_handler: NativeSyscallHandler<'_>,
@@ -152,20 +152,12 @@ pub fn run_native_executor(
         data.iter().map(|stark_felt| stark_felt_to_native_felt(*stark_felt)).collect_vec()
     };
 
-    let execution_result = match native_executor {
-        NativeExecutor::Aot(executor) => executor.invoke_contract_dynamic(
-            sierra_entry_function_id,
-            &stark_felts_to_native_felts(&call.calldata.0),
-            Some(call.initial_gas.into()),
-            &mut syscall_handler,
-        ),
-        NativeExecutor::Jit(executor) => executor.invoke_contract_dynamic(
-            sierra_entry_function_id,
-            &stark_felts_to_native_felts(&call.calldata.0),
-            Some(call.initial_gas.into()),
-            &mut syscall_handler,
-        ),
-    };
+    let execution_result = native_executor.invoke_contract_dynamic(
+        sierra_entry_function_id,
+        &stark_felts_to_native_felts(&call.calldata.0),
+        Some(call.initial_gas.into()),
+        &mut syscall_handler,
+    );
 
     let run_result = match execution_result {
         Ok(res) if res.failure_flag => Err(EntryPointExecutionError::NativeExecutionError {
