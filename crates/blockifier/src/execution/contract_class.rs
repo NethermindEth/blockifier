@@ -132,7 +132,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -597,8 +597,6 @@ pub struct SierraContractClassV1Inner {
     pub sierra_program: SierraProgram,
     pub entry_points_by_type: SierraContractEntryPoints,
     sierra_program_raw: Vec<BigUintAsHex>,
-    // Throughout the code base ContractClasses are cloned a lot
-    // therefore we put the NativeExecutor in an Arc.
     pub executor: AotNativeExecutor,
 }
 
