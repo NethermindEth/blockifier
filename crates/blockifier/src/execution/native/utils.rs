@@ -5,17 +5,14 @@ use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
-use cairo_native::cache::{AotProgramCache, ProgramCache};
-use cairo_native::context::NativeContext;
 use cairo_native::execution_result::ContractExecutionResult;
-use cairo_native::executor::{AotNativeExecutor, NativeExecutor};
+use cairo_native::executor::AotNativeExecutor;
 use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
-use cairo_native::OptLevel;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use itertools::Itertools;
 use num_bigint::BigUint;
 use num_traits::ToBytes;
-use starknet_api::core::{ClassHash, ContractAddress, EntryPointSelector};
+use starknet_api::core::{ContractAddress, EntryPointSelector};
 use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
@@ -67,48 +64,6 @@ pub fn match_entrypoint(
         .ok_or(EntryPointExecutionError::NativeExecutionError {
             info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
         })
-}
-
-static NATIVE_CONTEXT: std::sync::OnceLock<cairo_native::context::NativeContext> =
-    std::sync::OnceLock::new();
-
-pub fn get_native_aot_program_cache<'context>() -> AotProgramCache<'context, ClassHash> {
-    AotProgramCache::new(NATIVE_CONTEXT.get_or_init(NativeContext::new))
-}
-
-pub fn get_native_executor<'context>(
-    class_hash: ClassHash,
-    program: &SierraProgram,
-    program_cache: &mut ProgramCache<'context, ClassHash>,
-) -> NativeExecutor<'context> {
-    match program_cache {
-        ProgramCache::Aot(cache) => {
-            let cached_executor = cache.get(&class_hash);
-            NativeExecutor::Aot(match cached_executor {
-                Some(executor) => {
-                    println!("AOT Cache Hit");
-                    executor
-                }
-                None => {
-                    println!("AOT Cache Miss");
-                    cache.compile_and_insert(class_hash, program, OptLevel::Default)
-                }
-            })
-        }
-        ProgramCache::Jit(cache) => {
-            let cached_executor = cache.get(&class_hash);
-            NativeExecutor::Jit(match cached_executor {
-                Some(executor) => {
-                    println!("JIT Cache Hit");
-                    executor
-                }
-                None => {
-                    println!("JIT Cache Miss");
-                    cache.compile_and_insert(class_hash, program, OptLevel::Default)
-                }
-            })
-        }
-    }
 }
 
 pub fn get_sierra_entry_function_id<'a>(
