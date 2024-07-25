@@ -301,9 +301,11 @@ fn test_validate_read_set(
     // TODO(OriF 15/5/24): add a check for `get_compiled_contract_class`` once the deploy account
     // preceding a declare flow is solved.
 
-    assert!(safe_versioned_state
-        .pin_version(1)
-        .validate_read_set(&transactional_state.cache.borrow().initial_reads));
+    assert!(
+        safe_versioned_state
+            .pin_version(1)
+            .validate_read_set(&transactional_state.cache.borrow().initial_reads)
+    );
 }
 
 #[rstest]
