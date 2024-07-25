@@ -33,9 +33,7 @@ use starknet_api::deprecated_contract_class::{
 };
 
 use super::execution_utils::poseidon_hash_many_cost;
-use super::native::utils::{
-    contract_entrypoint_to_entrypoint_selector, get_native_aot_program_cache,
-};
+use super::native::utils::contract_entrypoint_to_entrypoint_selector;
 use crate::abi::abi_utils::selector_from_name;
 use crate::abi::constants::{self, CONSTRUCTOR_ENTRY_POINT_NAME};
 use crate::execution::entry_point::CallEntryPoint;
@@ -134,7 +132,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -551,12 +549,10 @@ impl SierraContractClassV1 {
     }
 
     pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
-        fn compile(sierra_program: SierraProgram) -> Arc<AotNativeExecutor> {
-            // todo(xrvdg) rewrite this compile function after profiling.
-            // We care about the result of the compilation and not about the program cache
-            // therefore we supply an empty cache and an arbitrary key.
-            let mut program_cache = get_native_aot_program_cache();
-            program_cache.compile_and_insert(Default::default(), &sierra_program, OptLevel::Default)
+        fn compile(sierra_program: &SierraProgram) -> Arc<AotNativeExecutor> {
+            let native_context = cairo_native::context::NativeContext::new();
+            let native_program = native_context.compile(sierra_program, None).unwrap();
+            Arc::new(AotNativeExecutor::from_native_module(native_program, OptLevel::Default))
         }
 
         let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
@@ -566,10 +562,10 @@ impl SierraContractClassV1 {
         //   2. Refactoring the code on the Cairo mono-repo
 
         let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
-        let executor = compile(sierra_program);
+        let executor = compile(&sierra_program);
 
         Ok(Self(Arc::new(SierraContractClassV1Inner {
-            sierra_program: sierra_contract_class.extract_sierra_program().unwrap(),
+            sierra_program,
             entry_points_by_type: sierra_contract_class.entry_points_by_type,
             sierra_program_raw: sierra_contract_class.sierra_program,
             executor,
