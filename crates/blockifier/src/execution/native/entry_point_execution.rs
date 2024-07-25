@@ -1,6 +1,7 @@
 use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
 use cairo_native::cache::ProgramCache;
+// use cairo_native::error::Error as NativeRunnerError;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use starknet_api::core::ClassHash;
 
@@ -55,6 +56,11 @@ pub fn execute_entry_point_call(
     println!("Blockifier-Native: running the Native Executor");
     let result =
         run_native_executor(native_executor, sierra_entry_function_id, call, syscall_handler);
+
+    // return Err(EntryPointExecutionError::NativeUnexpectedError {
+    //     source: NativeRunnerError::MissingMetadata,
+    // });
+
     println!("Blockifier-Native: Native Executor finished running");
     result
 }

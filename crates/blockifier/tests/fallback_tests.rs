@@ -51,5 +51,7 @@ fn test() {
 
     assert_eq!(context.call_entry_point("set_value", vec![StarkFelt::from(1u8)]), vec![]);
 
-    assert!(false);
+    // println!("{:?}", context.call_entry_point("get_value", vec![]));
+    //
+    // assert!(false);
 }

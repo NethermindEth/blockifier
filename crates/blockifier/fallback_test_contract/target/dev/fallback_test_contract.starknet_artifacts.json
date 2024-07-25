@@ -1,0 +1,1 @@
+{"version":1,"contracts":[{"id":"mi1v7mrnrg9eu","package_name":"fallback_test_contract","contract_name":"SimpleContract","module_path":"fallback_test_contract::SimpleContract","artifacts":{"sierra":"fallback_test_contract_SimpleContract.contract_class.json","casm":null}}]}

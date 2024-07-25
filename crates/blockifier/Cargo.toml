@@ -52,6 +52,7 @@ starknet_api = { workspace = true, features = ["testing"] }
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
+starknet-core.workspace = true
 
 [dev-dependencies]
 assert_matches.workspace = true
