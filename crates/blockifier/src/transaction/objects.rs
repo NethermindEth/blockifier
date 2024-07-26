@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+#[cfg(feature = "tracing")]
 use std::time::Duration;
 
 use cairo_felt::Felt252;
