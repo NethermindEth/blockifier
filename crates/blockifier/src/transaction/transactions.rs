@@ -14,7 +14,7 @@ use starknet_api::transaction::{
 
 use crate::abi::abi_utils::selector_from_name;
 use crate::context::{BlockContext, TransactionContext};
-use crate::debug::get_execution_resources;
+use crate::debug::{get_execution_resources, mock_resources};
 use crate::execution::call_info::CallInfo;
 use crate::execution::contract_class::{ClassInfo, ContractClass};
 use crate::execution::entry_point::{
@@ -55,7 +55,6 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         log::debug!("Executing Transaction...");
         let mut transactional_state = CachedState::create_transactional(state);
@@ -70,7 +69,6 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
             charge_fee,
             validate,
             Some(program_cache),
-            mock_resources,
         );
 
         match execution_result {
@@ -98,7 +96,6 @@ pub trait ExecutableTransaction<S: StateReader>: Sized {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo>;
 }
 
@@ -110,7 +107,6 @@ pub trait Executable<S: State> {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>>;
 }
 
@@ -191,7 +187,6 @@ impl<S: State> Executable<S> for DeclareTransaction {
         _context: &mut EntryPointExecutionContext,
         _remaining_gas: &mut u64,
         _program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        _mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let class_hash = self.class_hash();
 
@@ -316,7 +311,6 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let class_hash = self.class_hash();
         let ctor_context = ConstructorContext {
@@ -336,7 +330,7 @@ impl<S: State> Executable<S> for DeployAccountTransaction {
         )?;
         update_remaining_gas(remaining_gas, &call_info);
 
-        if mock_resources {
+        if mock_resources() {
             call_info.resources = get_execution_resources(self.tx_hash);
         }
 
@@ -415,7 +409,6 @@ impl<S: State> Executable<S> for InvokeTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let entry_point_selector = match &self.tx {
             starknet_api::transaction::InvokeTransaction::V0(tx) => tx.entry_point_selector,
@@ -448,7 +441,7 @@ impl<S: State> Executable<S> for InvokeTransaction {
             })?;
         update_remaining_gas(remaining_gas, &call_info);
 
-        if mock_resources {
+        if mock_resources() {
             call_info.resources = get_execution_resources(self.tx_hash);
         }
 
@@ -544,7 +537,6 @@ impl<S: State> Executable<S> for L1HandlerTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         let tx = &self.tx;
         let storage_address = tx.contract_address;
@@ -573,7 +565,7 @@ impl<S: State> Executable<S> for L1HandlerTransaction {
             })
             .map(|e| {
                 e.map(|mut call_info| {
-                    if mock_resources {
+                    if mock_resources() {
                         call_info.resources = get_execution_resources(self.tx_hash);
                     }
                     call_info

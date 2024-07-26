@@ -491,7 +491,6 @@ dependencies = [
  "num-rational",
  "num-traits 0.2.19",
  "once_cell",
- "papyrus_common",
  "phf",
  "pretty_assertions",
  "rand",
@@ -3083,24 +3082,6 @@ checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "papyrus_common"
-version = "0.4.0-dev.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96911b8d58de6274f628a4b626b4c145627b64a8b76e4e7f8a40c56e56f0ed84"
-dependencies = [
- "bitvec",
- "cairo-lang-starknet-classes",
- "hex",
- "lazy_static",
- "serde",
- "serde_json",
- "sha3",
- "starknet-crypto 0.5.2",
- "starknet_api",
- "thiserror",
 ]
 
 [[package]]

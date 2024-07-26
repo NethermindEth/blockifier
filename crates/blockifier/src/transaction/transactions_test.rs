@@ -383,8 +383,7 @@ fn test_invoke_tx(
     let account_tx = AccountTransaction::Invoke(invoke_tx);
     let tx_context = block_context.to_tx_context(&account_tx);
 
-    let actual_execution_info =
-        account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let actual_execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
 
     // Build expected validate call info.
     let expected_account_class_hash = account_contract.get_class_hash();
@@ -555,7 +554,7 @@ fn test_invoke_tx_advanced_operations(
             create_calldata(contract_address, "advance_counter", &calldata_args),
         ..base_tx_args.clone()
     });
-    account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    account_tx.execute(state, block_context, true, true, None).unwrap();
 
     let next_nonce = nonce_manager.next(account_address);
     let initial_ec_point = [StarkFelt::ZERO, StarkFelt::ZERO];
@@ -584,7 +583,7 @@ fn test_invoke_tx_advanced_operations(
             create_calldata(contract_address, "call_xor_counters", &calldata_args),
         ..base_tx_args.clone()
     });
-    account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    account_tx.execute(state, block_context, true, true, None).unwrap();
 
     let expected_counters = [
         stark_felt!(counter_diffs[0] ^ xor_values[0]),
@@ -608,7 +607,7 @@ fn test_invoke_tx_advanced_operations(
             create_calldata(contract_address, "test_ec_op", &[]),
         ..base_tx_args.clone()
     });
-    account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    account_tx.execute(state, block_context, true, true, None).unwrap();
 
     let expected_ec_point = [
         StarkFelt::new([
@@ -646,7 +645,7 @@ fn test_invoke_tx_advanced_operations(
             create_calldata(contract_address, "add_signature_to_counters", &[index]),
         ..base_tx_args.clone()
     });
-    account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    account_tx.execute(state, block_context, true, true, None).unwrap();
 
     let expected_counters = [
         felt_to_stark_felt(
@@ -675,7 +674,7 @@ fn test_invoke_tx_advanced_operations(
             create_calldata(contract_address, "send_message", &[felt_to_stark_felt(&to_address)]),
         ..base_tx_args
     });
-    let execution_info = account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
     let next_nonce = nonce_manager.next(account_address);
     verify_storage_after_invoke_advanced_operations(
         state,
@@ -737,7 +736,7 @@ fn test_state_get_fee_token_balance(
         version: tx_version,
         nonce: Nonce::default(),
     });
-    account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    account_tx.execute(state, block_context, true, true, None).unwrap();
 
     // Get balance from state, and validate.
     let (low, high) =
@@ -755,7 +754,7 @@ fn assert_failure_if_resource_bounds_exceed_balance(
     match block_context.to_tx_context(&invalid_tx).tx_info {
         TransactionInfo::Deprecated(context) => {
             assert_matches!(
-                invalid_tx.execute(state, block_context, true, true, None, false).unwrap_err(),
+                invalid_tx.execute(state, block_context, true, true, None).unwrap_err(),
                 TransactionExecutionError::TransactionPreValidationError(
                     TransactionPreValidationError::TransactionFeeError(
                         TransactionFeeError::MaxFeeExceedsBalance{ max_fee, .. }))
@@ -765,7 +764,7 @@ fn assert_failure_if_resource_bounds_exceed_balance(
         TransactionInfo::Current(context) => {
             let l1_bounds = context.l1_resource_bounds().unwrap();
             assert_matches!(
-                invalid_tx.execute(state, block_context, true, true, None, false).unwrap_err(),
+                invalid_tx.execute(state, block_context, true, true, None).unwrap_err(),
                 TransactionExecutionError::TransactionPreValidationError(
                     TransactionPreValidationError::TransactionFeeError(
                         TransactionFeeError::L1GasBoundsExceedBalance{ max_amount, max_price, .. }))
@@ -875,7 +874,7 @@ fn test_insufficient_resource_bounds(
         invoke_tx_args! { max_fee: invalid_max_fee, ..valid_invoke_tx_args.clone() },
     );
     let execution_error =
-        invalid_v1_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+        invalid_v1_tx.execute(state, block_context, true, true, None).unwrap_err();
 
     // Test error.
     assert_matches!(
@@ -899,7 +898,7 @@ fn test_insufficient_resource_bounds(
         ..valid_invoke_tx_args.clone()
     });
     let execution_error =
-        invalid_v3_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+        invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
     // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion works.
     let minimal_l1_gas_as_u64 =
         u64::try_from(minimal_l1_gas).expect("Failed to convert u128 to u64.");
@@ -923,7 +922,7 @@ fn test_insufficient_resource_bounds(
         ..valid_invoke_tx_args
     });
     let execution_error =
-        invalid_v3_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+        invalid_v3_tx.execute(state, block_context, true, true, None).unwrap_err();
     assert_matches!(
         execution_error,
         TransactionExecutionError::TransactionPreValidationError(
@@ -960,8 +959,7 @@ fn test_actual_fee_gt_resource_bounds(
     // The estimated minimal fee is lower than the actual fee.
     let invalid_tx = account_invoke_tx(invoke_tx_args! { max_fee: minimal_fee, ..invoke_tx_args });
 
-    let execution_result =
-        invalid_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let execution_result = invalid_tx.execute(state, block_context, true, true, None).unwrap();
     let execution_error = execution_result.revert_error.unwrap();
     // Test error.
     assert!(execution_error.starts_with("Insufficient max fee:"));
@@ -1129,8 +1127,7 @@ fn test_declare_tx(
     );
     let fee_type = &account_tx.fee_type();
     let tx_context = &block_context.to_tx_context(&account_tx);
-    let actual_execution_info =
-        account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let actual_execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
 
     // Build expected validate call info.
     let expected_validate_call_info = declare_validate_callinfo(
@@ -1245,8 +1242,7 @@ fn test_deploy_account_tx(
     let account_tx = AccountTransaction::DeployAccount(deploy_account);
     let fee_type = &account_tx.fee_type();
     let tx_context = &block_context.to_tx_context(&account_tx);
-    let actual_execution_info =
-        account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let actual_execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
 
     // Build expected validate call info.
     let validate_calldata =
@@ -1352,7 +1348,7 @@ fn test_deploy_account_tx(
         &mut nonce_manager,
     );
     let account_tx = AccountTransaction::DeployAccount(deploy_account);
-    let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+    let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
     assert_matches!(
         error,
         TransactionExecutionError::ContractConstructorExecutionFailed(
@@ -1388,7 +1384,7 @@ fn test_fail_deploy_account_undeclared_class_hash(block_context: BlockContext) {
         .unwrap();
 
     let account_tx = AccountTransaction::DeployAccount(deploy_account);
-    let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+    let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
     assert_matches!(
         error,
         TransactionExecutionError::ContractConstructorExecutionFailed(
@@ -1451,7 +1447,7 @@ fn test_validate_accounts_tx(
             ..default_args
         },
     );
-    let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+    let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
     check_transaction_execution_error_for_invalid_scenario!(
         cairo_version,
         error,
@@ -1470,7 +1466,7 @@ fn test_validate_accounts_tx(
             ..default_args
         },
     );
-    let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+    let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
     check_transaction_execution_error_for_custom_hint!(
         &error,
         "Unauthorized syscall call_contract in execution mode Validate.",
@@ -1488,7 +1484,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+        let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
         check_transaction_execution_error_for_custom_hint!(
             &error,
             "Unauthorized syscall get_block_hash in execution mode Validate.",
@@ -1505,7 +1501,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let error = account_tx.execute(state, block_context, true, true, None, false).unwrap_err();
+        let error = account_tx.execute(state, block_context, true, true, None).unwrap_err();
         check_transaction_execution_error_for_custom_hint!(
             &error,
             "Unauthorized syscall get_sequencer_address in execution mode Validate.",
@@ -1528,7 +1524,7 @@ fn test_validate_accounts_tx(
             ..default_args
         },
     );
-    let result = account_tx.execute(state, block_context, true, true, None, false);
+    let result = account_tx.execute(state, block_context, true, true, None);
     assert!(result.is_ok(), "Execution failed: {:?}", result.unwrap_err());
 
     if tx_type != TransactionType::DeployAccount {
@@ -1544,7 +1540,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let result = account_tx.execute(state, block_context, true, true, None, false);
+        let result = account_tx.execute(state, block_context, true, true, None);
         assert!(result.is_ok(), "Execution failed: {:?}", result.unwrap_err());
     }
 
@@ -1563,7 +1559,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let result = account_tx.execute(state, block_context, true, true, None, false);
+        let result = account_tx.execute(state, block_context, true, true, None);
         assert!(result.is_ok(), "Execution failed: {:?}", result.unwrap_err());
 
         // Call the syscall get_block_timestamp and assert the returned timestamp was modified
@@ -1578,7 +1574,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let result = account_tx.execute(state, block_context, true, true, None, false);
+        let result = account_tx.execute(state, block_context, true, true, None);
         assert!(result.is_ok(), "Execution failed: {:?}", result.unwrap_err());
     }
 
@@ -1599,7 +1595,7 @@ fn test_validate_accounts_tx(
                 ..default_args
             },
         );
-        let result = account_tx.execute(state, block_context, true, true, None, false);
+        let result = account_tx.execute(state, block_context, true, true, None);
         assert!(result.is_ok(), "Execution failed: {:?}", result.unwrap_err());
     }
 }
@@ -1626,7 +1622,7 @@ fn test_valid_flag(
     });
 
     let actual_execution_info =
-        account_tx.execute(state, block_context, true, false, None, false).unwrap();
+        account_tx.execute(state, block_context, true, false, None).unwrap();
 
     assert!(actual_execution_info.validate_call_info.is_none());
 }
@@ -1701,8 +1697,7 @@ fn test_only_query_flag(block_context: BlockContext, #[values(true, false)] only
     );
     let account_tx = AccountTransaction::Invoke(invoke_tx);
 
-    let tx_execution_info =
-        account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let tx_execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
     assert!(!tx_execution_info.is_reverted())
 }
 
@@ -1721,7 +1716,7 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
     let value = calldata.0[2];
     let payload_size = tx.payload_size();
 
-    let actual_execution_info = tx.execute(state, block_context, true, true, None, false).unwrap();
+    let actual_execution_info = tx.execute(state, block_context, true, true, None).unwrap();
 
     // Build the expected call info.
     let accessed_storage_key = StorageKey::try_from(key).unwrap();
@@ -1835,7 +1830,7 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
         )
         .unwrap();
     let tx_no_fee = L1HandlerTransaction::create_for_testing(Fee(0), contract_address);
-    let error = tx_no_fee.execute(state, block_context, true, true, None, false).unwrap_err();
+    let error = tx_no_fee.execute(state, block_context, true, true, None).unwrap_err();
     // Today, we check that the paid_fee is positive, no matter what was the actual fee.
     let expected_actual_fee =
         calculate_tx_fee(&expected_execution_info.actual_resources, block_context, &FeeType::Eth)
@@ -1868,7 +1863,7 @@ fn test_execute_tx_with_invalid_transaction_version(block_context: BlockContext)
         calldata,
     });
 
-    let execution_info = account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
     assert!(
         execution_info
             .revert_error
@@ -1971,7 +1966,7 @@ fn test_emit_event_exceeds_limit(
         version: TransactionVersion::ONE,
         nonce: nonce!(0_u8),
     });
-    let execution_info = account_tx.execute(state, block_context, true, true, None, false).unwrap();
+    let execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
     match &expected_error {
         Some(expected_error) => {
             let error_string = execution_info.revert_error.unwrap();

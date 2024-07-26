@@ -6,7 +6,7 @@ use starknet_api::core::{calculate_contract_address, ClassHash, ContractAddress}
 use starknet_api::transaction::{Fee, Transaction as StarknetApiTransaction, TransactionHash};
 
 use crate::context::BlockContext;
-use crate::debug::get_execution_resources;
+use crate::debug::{get_execution_resources, mock_resources};
 use crate::execution::contract_class::ClassInfo;
 use crate::execution::entry_point::EntryPointExecutionContext;
 use crate::fee::actual_cost::TransactionReceipt;
@@ -109,7 +109,6 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         _charge_fee: bool,
         _validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
 
@@ -122,11 +121,10 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
             &mut context,
             &mut remaining_gas,
             program_cache,
-            mock_resources,
         )?;
         let l1_handler_payload_size = self.payload_size();
 
-        if mock_resources {
+        if mock_resources() {
             execution_resources = get_execution_resources(self.tx_hash);
         }
 
@@ -166,25 +164,14 @@ impl<S: StateReader> ExecutableTransaction<S> for Transaction {
         charge_fee: bool,
         validate: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         match self {
-            Self::AccountTransaction(account_tx) => account_tx.execute_raw(
-                state,
-                block_context,
-                charge_fee,
-                validate,
-                program_cache,
-                mock_resources,
-            ),
-            Self::L1HandlerTransaction(tx) => tx.execute_raw(
-                state,
-                block_context,
-                charge_fee,
-                validate,
-                program_cache,
-                mock_resources,
-            ),
+            Self::AccountTransaction(account_tx) => {
+                account_tx.execute_raw(state, block_context, charge_fee, validate, program_cache)
+            }
+            Self::L1HandlerTransaction(tx) => {
+                tx.execute_raw(state, block_context, charge_fee, validate, program_cache)
+            }
         }
     }
 }

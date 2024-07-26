@@ -13,7 +13,7 @@ use starknet_api::transaction::{
 use crate::abi::abi_utils::{get_fee_token_var_address, selector_from_name};
 use crate::abi::sierra_types::next_storage_key;
 use crate::context::{BlockContext, TransactionContext};
-use crate::debug::get_execution_resources;
+use crate::debug::{get_execution_resources, mock_resources};
 use crate::execution::call_info::{CallInfo, Retdata};
 use crate::execution::contract_class::ContractClass;
 use crate::execution::entry_point::{CallEntryPoint, CallType, EntryPointExecutionContext};
@@ -427,33 +427,17 @@ impl AccountTransaction {
         context: &mut EntryPointExecutionContext,
         remaining_gas: &mut u64,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<Option<CallInfo>> {
         match &self {
-            Self::Declare(tx) => tx.run_execute(
-                state,
-                resources,
-                context,
-                remaining_gas,
-                program_cache,
-                mock_resources,
-            ),
-            Self::DeployAccount(tx) => tx.run_execute(
-                state,
-                resources,
-                context,
-                remaining_gas,
-                program_cache,
-                mock_resources,
-            ),
-            Self::Invoke(tx) => tx.run_execute(
-                state,
-                resources,
-                context,
-                remaining_gas,
-                program_cache,
-                mock_resources,
-            ),
+            Self::Declare(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
+            Self::DeployAccount(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
+            Self::Invoke(tx) => {
+                tx.run_execute(state, resources, context, remaining_gas, program_cache)
+            }
         }
     }
 
@@ -466,7 +450,6 @@ impl AccountTransaction {
         validate: bool,
         charge_fee: bool,
         mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         println!("AccountTransaction::run_non_revertible");
         let mut resources = ExecutionResources::default();
@@ -485,7 +468,6 @@ impl AccountTransaction {
                 &mut execution_context,
                 remaining_gas,
                 program_cache.as_deref_mut(),
-                mock_resources,
             )?;
             validate_call_info = self.handle_validate_tx(
                 state,
@@ -514,11 +496,10 @@ impl AccountTransaction {
                 &mut execution_context,
                 remaining_gas,
                 program_cache,
-                mock_resources,
             )?;
         }
 
-        if mock_resources {
+        if mock_resources() {
             resources = get_execution_resources(self.tx_hash());
         }
 
@@ -560,7 +541,6 @@ impl AccountTransaction {
         validate: bool,
         charge_fee: bool,
         mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         let mut resources = ExecutionResources::default();
         let mut execution_context =
@@ -597,10 +577,9 @@ impl AccountTransaction {
             &mut execution_context,
             remaining_gas,
             program_cache,
-            mock_resources,
         );
 
-        if mock_resources {
+        if mock_resources() {
             let resources = get_execution_resources(self.tx_hash());
             execution_resources = resources;
         }
@@ -712,7 +691,6 @@ impl AccountTransaction {
         validate: bool,
         charge_fee: bool,
         program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<ValidateExecuteCallInfo> {
         if self.is_non_revertible(&tx_context.tx_info) {
             return self.run_non_revertible(
@@ -722,19 +700,10 @@ impl AccountTransaction {
                 validate,
                 charge_fee,
                 program_cache,
-                mock_resources,
             );
         }
 
-        self.run_revertible(
-            state,
-            tx_context,
-            remaining_gas,
-            validate,
-            charge_fee,
-            program_cache,
-            mock_resources,
-        )
+        self.run_revertible(state, tx_context, remaining_gas, validate, charge_fee, program_cache)
     }
 }
 
@@ -746,7 +715,6 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
         charge_fee: bool,
         validate: bool,
         mut program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
-        mock_resources: bool,
     ) -> TransactionExecutionResult<TransactionExecutionInfo> {
         let tx_context = Arc::new(block_context.to_tx_context(self));
         self.verify_tx_version(tx_context.tx_info.version())?;
@@ -775,7 +743,6 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             validate,
             charge_fee,
             program_cache.as_deref_mut(),
-            mock_resources,
         )?;
 
         let fee_transfer_call_info =

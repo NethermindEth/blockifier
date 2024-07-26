@@ -77,3 +77,7 @@ pub fn get_execution_resources(tx_hash: TransactionHash) -> ExecutionResources {
         builtin_instance_counter,
     }
 }
+
+pub fn mock_resources() -> bool {
+    std::env::var("MOCK_RESOURCES").unwrap_or("0".to_string()) == "1".to_string()
+}
