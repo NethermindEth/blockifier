@@ -1313,3 +1313,28 @@ fn test_concurrency_execute_fee_transfer(#[values(FeeType::Eth, FeeType::Strk)] 
         assert_eq!(*seq_write_val.unwrap(), expexted_write_val);
     }
 }
+
+#[cfg(feature = "tracing")]
+#[rstest]
+fn test_tracing_duration(block_context: BlockContext, max_fee: Fee) {
+    let TestInitData { mut state, account_address, contract_address, mut nonce_manager } =
+        create_test_init_data(&block_context.chain_info, CairoVersion::Cairo0);
+
+    let tx_execution_info = run_invoke_tx(
+        &mut state,
+        &block_context,
+        invoke_tx_args! {
+            max_fee,
+            sender_address: account_address,
+            calldata: create_trivial_calldata(contract_address),
+            version: TransactionVersion::ONE,
+            nonce: nonce_manager.next(account_address),
+        },
+    )
+    .unwrap();
+
+    assert!(
+        tx_execution_info.duration.is_some(),
+        "Duration should be Some when tracing is enabled"
+    );
+}

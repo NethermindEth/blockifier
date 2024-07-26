@@ -1,4 +1,6 @@
 use std::sync::Arc;
+#[cfg(feature = "tracing")]
+use std::time::Instant;
 
 use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
@@ -114,6 +116,8 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
         let mut execution_resources = ExecutionResources::default();
         let mut context = EntryPointExecutionContext::new_invoke(tx_context.clone(), true)?;
         let mut remaining_gas = block_context.versioned_constants.tx_initial_gas();
+        #[cfg(feature = "tracing")]
+        let start_time = Instant::now();
         let execute_call_info = self.run_execute(
             state,
             &mut execution_resources,
@@ -121,6 +125,8 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
             &mut remaining_gas,
             program_cache,
         )?;
+        #[cfg(feature = "tracing")]
+        let duration = start_time.elapsed();
         let l1_handler_payload_size = self.payload_size();
 
         let TransactionReceipt { fee: actual_fee, da_gas, resources: actual_resources, .. } =
@@ -147,6 +153,8 @@ impl<S: StateReader> ExecutableTransaction<S> for L1HandlerTransaction {
             da_gas,
             revert_error: None,
             actual_resources,
+            #[cfg(feature = "tracing")]
+            duration: Some(duration),
         })
     }
 }

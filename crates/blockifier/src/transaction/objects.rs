@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use cairo_felt::Felt252;
 use cairo_vm::vm::runners::builtin_runner::SEGMENT_ARENA_BUILTIN_NAME;
@@ -235,6 +236,8 @@ pub struct TransactionExecutionInfo {
     // TODO(Dori, 1/8/2023): If the `Eq` and `PartialEq` traits are removed, or implemented on all
     //   internal structs in this enum, this field should be `Option<TransactionExecutionError>`.
     pub revert_error: Option<String>,
+    #[cfg(feature = "tracing")]
+    pub duration: Option<Duration>,
 }
 
 impl TransactionExecutionInfo {

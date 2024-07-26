@@ -1,4 +1,6 @@
 use std::sync::Arc;
+#[cfg(feature = "tracing")]
+use std::time::Instant;
 
 use cairo_native::cache::ProgramCache;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
@@ -702,6 +704,8 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
 
         // Run validation and execution.
         let mut remaining_gas = block_context.versioned_constants.tx_initial_gas();
+        #[cfg(feature = "tracing")]
+        let start_time = Instant::now();
         let ValidateExecuteCallInfo {
             validate_call_info,
             execute_call_info,
@@ -721,6 +725,8 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             charge_fee,
             program_cache.as_deref_mut(),
         )?;
+        #[cfg(feature = "tracing")]
+        let duration = start_time.elapsed();
         let fee_transfer_call_info =
             self.handle_fee(state, tx_context, final_fee, charge_fee, program_cache)?;
 
@@ -732,6 +738,8 @@ impl<S: StateReader> ExecutableTransaction<S> for AccountTransaction {
             da_gas: final_da_gas,
             actual_resources: final_resources,
             revert_error,
+            #[cfg(feature = "tracing")]
+            duration: Some(duration),
         };
         Ok(tx_execution_info)
     }

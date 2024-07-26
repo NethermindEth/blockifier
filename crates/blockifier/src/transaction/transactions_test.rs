@@ -465,6 +465,8 @@ fn test_invoke_tx(
         da_gas,
         actual_resources: expected_actual_resources,
         revert_error: None,
+        #[cfg(feature = "tracing")]
+        duration: None,
     };
 
     add_kzg_da_resources_to_resources_mapping(
@@ -1169,6 +1171,8 @@ fn test_declare_tx(
         da_gas,
         revert_error: None,
         actual_resources: expected_actual_resources,
+        #[cfg(feature = "tracing")]
+        duration: None,
     };
 
     add_kzg_da_resources_to_resources_mapping(
@@ -1310,6 +1314,8 @@ fn test_deploy_account_tx(
         da_gas,
         revert_error: None,
         actual_resources,
+        #[cfg(feature = "tracing")]
+        duration: None,
     };
 
     add_kzg_da_resources_to_resources_mapping(
@@ -1807,6 +1813,8 @@ fn test_l1_handler(#[values(false, true)] use_kzg_da: bool) {
         da_gas: expected_da_gas,
         actual_resources: expected_tx_resources,
         revert_error: None,
+        #[cfg(feature = "tracing")]
+        duration: None,
     };
 
     // Check the actual returned execution info.
@@ -1976,4 +1984,30 @@ fn test_emit_event_exceeds_limit(
             assert!(!execution_info.is_reverted());
         }
     }
+}
+
+#[cfg(feature = "tracing")]
+#[rstest]
+fn test_tracing_duration_for_transactions() {
+    let block_context = &BlockContext::create_for_account_testing_with_kzg(true);
+    let account_contract = FeatureContract::AccountWithoutValidations(CairoVersion::Cairo0);
+    let test_contract = FeatureContract::TestContract(CairoVersion::Cairo0);
+    let chain_info = &block_context.chain_info;
+    let state = &mut test_state(chain_info, BALANCE, &[(account_contract, 1), (test_contract, 1)]);
+    let test_contract_address = test_contract.get_instance_address(0);
+    let account_contract_address = account_contract.get_instance_address(0);
+    let invoke_tx = invoke_tx(invoke_tx_args! {
+        sender_address: account_contract_address,
+        calldata: create_trivial_calldata(test_contract_address),
+        max_fee: Fee(MAX_FEE)
+    });
+
+    let account_tx = AccountTransaction::Invoke(invoke_tx);
+
+    let actual_execution_info = account_tx.execute(state, block_context, true, true, None).unwrap();
+
+    assert!(
+        actual_execution_info.duration.is_some(),
+        "Invoke transaction duration should be Some when tracing is enabled"
+    );
 }
