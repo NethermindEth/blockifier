@@ -57,7 +57,7 @@ pub type ContractClassResult<T> = Result<T, ContractClassError>;
 pub enum ContractClass {
     V0(ContractClassV0),
     V1(ContractClassV1),
-    V1Sierra(SierraContractClassV1),
+    V1Native(NativeContractClassV1),
 }
 
 impl ContractClass {
@@ -65,7 +65,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.constructor_selector(),
             ContractClass::V1(class) => class.constructor_selector(),
-            ContractClass::V1Sierra(class) => class.constructor_selector(),
+            ContractClass::V1Native(class) => class.constructor_selector(),
         }
     }
 
@@ -73,7 +73,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.estimate_casm_hash_computation_resources(),
             ContractClass::V1(class) => class.estimate_casm_hash_computation_resources(),
-            ContractClass::V1Sierra(_) => todo!("sierra estimate casm hash computation resources"),
+            ContractClass::V1Native(_) => todo!("sierra estimate casm hash computation resources"),
         }
     }
 
@@ -86,7 +86,7 @@ impl ContractClass {
                 panic!("get_visited_segments is not supported for v0 contracts.")
             }
             ContractClass::V1(class) => class.get_visited_segments(visited_pcs),
-            ContractClass::V1Sierra(_) => todo!("sierra visited segments"),
+            ContractClass::V1Native(_) => todo!("sierra visited segments"),
         }
     }
 
@@ -94,7 +94,7 @@ impl ContractClass {
         match self {
             ContractClass::V0(class) => class.bytecode_length(),
             ContractClass::V1(class) => class.bytecode_length(),
-            ContractClass::V1Sierra(_) => todo!("sierra estimate casm hash computation resources"),
+            ContractClass::V1Native(_) => todo!("sierra estimate casm hash computation resources"),
         }
     }
 }
@@ -518,7 +518,7 @@ impl ClassInfo {
         let (contract_class_version, condition) = match contract_class {
             ContractClass::V0(_) => (0, sierra_program_length == 0),
             ContractClass::V1(_) => (1, sierra_program_length > 0),
-            ContractClass::V1Sierra(_) => (1, sierra_program_length > 0),
+            ContractClass::V1Native(_) => (1, sierra_program_length > 0),
         };
 
         if condition {
@@ -533,16 +533,16 @@ impl ClassInfo {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SierraContractClassV1(pub Arc<SierraContractClassV1Inner>);
-impl Deref for SierraContractClassV1 {
-    type Target = SierraContractClassV1Inner;
+pub struct NativeContractClassV1(pub Arc<NativeContractClassV1Inner>);
+impl Deref for NativeContractClassV1 {
+    type Target = NativeContractClassV1Inner;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl SierraContractClassV1 {
+impl NativeContractClassV1 {
     fn constructor_selector(&self) -> Option<EntryPointSelector> {
         let entrypoint = self.deref().entry_points_by_type.constructor.first()?;
         Some(contract_entrypoint_to_entrypoint_selector(entrypoint))
@@ -564,7 +564,7 @@ impl SierraContractClassV1 {
         let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
         let executor = compile(&sierra_program);
 
-        Ok(Self(Arc::new(SierraContractClassV1Inner {
+        Ok(Self(Arc::new(NativeContractClassV1Inner {
             sierra_program,
             entry_points_by_type: sierra_contract_class.entry_points_by_type,
             sierra_program_raw: sierra_contract_class.sierra_program,
@@ -589,7 +589,7 @@ impl SierraContractClassV1 {
 }
 
 #[derive(Debug)]
-pub struct SierraContractClassV1Inner {
+pub struct NativeContractClassV1Inner {
     // todo(xrvdg) can we make sierra_program private such that it
     // is only available for debugging purposes?
     // For now execute_entry_point_call needs it
@@ -601,7 +601,7 @@ pub struct SierraContractClassV1Inner {
 }
 
 // Manual implementation as the executor has no comparison
-impl PartialEq for SierraContractClassV1Inner {
+impl PartialEq for NativeContractClassV1Inner {
     fn eq(&self, other: &Self) -> bool {
         self.sierra_program == other.sierra_program
             && self.entry_points_by_type == other.entry_points_by_type

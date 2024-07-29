@@ -76,7 +76,7 @@ pub fn execute_entry_point_call(
             resources,
             context,
         ),
-        ContractClass::V1Sierra(contract_class) => {
+        ContractClass::V1Native(contract_class) => {
             let fallback = env::var("FALLBACK_ENABLED").unwrap_or(String::from("0")) == "1";
             match native_entry_point_execution::execute_entry_point_call(
                 call.clone(),

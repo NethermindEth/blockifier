@@ -590,7 +590,7 @@ fn get_entry_point_offset(
                 .unwrap()
                 .offset
         }
-        ContractClass::V1Sierra(_) => {
+        ContractClass::V1Native(_) => {
             panic!("Expected V0 or V1, found V1Sierra in entry point tests")
         }
     }

@@ -347,7 +347,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             ContractClass::V0(_) => Err(encode_str_as_felts(
                 &SyscallExecutionError::ForbiddenClassReplacement { class_hash }.to_string(),
             )),
-            ContractClass::V1(_) | ContractClass::V1Sierra(_) => {
+            ContractClass::V1(_) | ContractClass::V1Native(_) => {
                 self.state
                     .set_class_hash_at(self.contract_address, class_hash)
                     .map_err(|e| encode_str_as_felts(&e.to_string()))?;
