@@ -565,10 +565,9 @@ impl NativeContractClassV1 {
         let executor = compile(&sierra_program);
 
         Ok(Self(Arc::new(NativeContractClassV1Inner {
-            sierra_program,
+            executor,
             entry_points_by_type: sierra_contract_class.entry_points_by_type,
             sierra_program_raw: sierra_contract_class.sierra_program,
-            executor,
         })))
     }
 
@@ -593,15 +592,13 @@ pub struct NativeContractClassV1Inner {
     pub executor: AotNativeExecutor,
     pub entry_points_by_type: SierraContractEntryPoints,
     // The private entries are for the fallback mechanism
-    sierra_program: SierraProgram,
     sierra_program_raw: Vec<BigUintAsHex>,
 }
 
 // Manual implementation as the executor has no comparison
 impl PartialEq for NativeContractClassV1Inner {
     fn eq(&self, other: &Self) -> bool {
-        self.sierra_program == other.sierra_program
-            && self.entry_points_by_type == other.entry_points_by_type
+        self.entry_points_by_type == other.entry_points_by_type
             && self.sierra_program_raw == other.sierra_program_raw
     }
 }
