@@ -27,7 +27,7 @@ cairo-lang-sierra = "=2.6.4"
 cairo-lang-starknet = "=2.6.4"
 cairo-lang-starknet-classes = "=2.6.4"
 cairo-lang-utils = "=2.6.4"
-cairo-native = { git = "https://github.com/lambdaclass/cairo_native", rev = "72d10b7923cb4f97ae0b1688ea7de1d34297b0b2" } # main
+cairo-native = { git = "https://github.com/lambdaclass/cairo_native", rev = "3fba00df4010c4d7d68d6dc26fea00804d7b13ba" } # main
 cairo-vm = "0.9.2"
 criterion = "0.3"
 derive_more = "0.99.17"
