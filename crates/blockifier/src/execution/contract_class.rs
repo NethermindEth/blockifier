@@ -132,7 +132,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -590,14 +590,11 @@ impl NativeContractClassV1 {
 
 #[derive(Debug)]
 pub struct NativeContractClassV1Inner {
-    // todo(xrvdg) can we make sierra_program private such that it
-    // is only available for debugging purposes?
-    // For now execute_entry_point_call needs it
-    // to get the entry function
-    pub sierra_program: SierraProgram,
-    pub entry_points_by_type: SierraContractEntryPoints,
-    sierra_program_raw: Vec<BigUintAsHex>,
     pub executor: AotNativeExecutor,
+    pub entry_points_by_type: SierraContractEntryPoints,
+    // The private entries are for the fallback mechanism
+    sierra_program: SierraProgram,
+    sierra_program_raw: Vec<BigUintAsHex>,
 }
 
 // Manual implementation as the executor has no comparison

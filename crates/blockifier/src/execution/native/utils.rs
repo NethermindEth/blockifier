@@ -3,7 +3,6 @@ use std::hash::RandomState;
 
 use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
-use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::AotNativeExecutor;
@@ -47,6 +46,7 @@ pub fn match_entrypoint(
         EntryPointType::L1Handler => &contract_entrypoints.l1_handler,
     };
 
+    // This selector seems off, comparing strings seem to be a bad way
     let cmp_selector_to_entrypoint =
         |selector: EntryPointSelector, entrypoint: &ContractEntryPoint| {
             let entrypoint_selector_str = entrypoint.selector.to_str_radix(16);
@@ -64,18 +64,6 @@ pub fn match_entrypoint(
         .ok_or(EntryPointExecutionError::NativeExecutionError {
             info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
         })
-}
-
-pub fn get_sierra_entry_function_id<'a>(
-    matching_entrypoint: &'a ContractEntryPoint,
-    sierra_program: &'a SierraProgram,
-) -> &'a FunctionId {
-    &sierra_program
-        .funcs
-        .iter()
-        .find(|func| func.id.id == u64::try_from(matching_entrypoint.function_idx).unwrap())
-        .unwrap()
-        .id
 }
 
 pub fn stark_felt_to_native_felt(stark_felt: StarkFelt) -> Felt {
