@@ -55,7 +55,7 @@ pub fn contract_entrypoint_to_entrypoint_selector(
 
 pub fn run_native_executor(
     native_executor: &AotNativeExecutor,
-    matching_entrypoint: &ContractEntryPoint,
+    function_id: &FunctionId,
     call: CallEntryPoint,
     mut syscall_handler: NativeSyscallHandler<'_>,
 ) -> EntryPointExecutionResult<CallInfo> {
@@ -65,7 +65,7 @@ pub fn run_native_executor(
 
     let execution_result = native_executor.invoke_contract_dynamic(
         // TODO(xrvdg) replace this unwrap by an error. Most likely the previous one
-        &FunctionId::new(matching_entrypoint.function_idx.try_into().unwrap()),
+        function_id,
         &stark_felts_to_native_felts(&call.calldata.0),
         Some(call.initial_gas.into()),
         &mut syscall_handler,
