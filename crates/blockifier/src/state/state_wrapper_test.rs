@@ -8,27 +8,24 @@ use crate::state::state_wrapper::DynStateWrapper;
 
 #[test]
 fn set_class_hash_at() {
+    let contract_address = ContractAddress::from(1u128);
     let mut state_1 = CachedState::default();
 
-    state_1
-        .set_class_hash_at(ContractAddress::from(1u128), ClassHash(StarkHash::from(1u128)))
-        .unwrap();
+    state_1.set_class_hash_at(contract_address, ClassHash(StarkHash::from(1u128))).unwrap();
 
     let mut state_2 = DynStateWrapper::new(&mut state_1);
 
     assert_eq!(
-        state_2.get_raw_class_hash_at(ContractAddress::from(1u128)).unwrap(),
+        state_2.get_raw_class_hash_at(contract_address).unwrap(),
         ClassHash(StarkHash::from(1u128))
     );
 
     assert_eq!(
-        state_2.get_class_hash_at(ContractAddress::from(1u128)).unwrap(),
+        state_2.get_class_hash_at(contract_address).unwrap(),
         ClassHash(StarkHash::from(1u128))
     );
 
-    state_2
-        .set_class_hash_at(ContractAddress::from(1u128), ClassHash(StarkHash::from(2u128)))
-        .unwrap();
+    state_2.set_class_hash_at(contract_address, ClassHash(StarkHash::from(2u128))).unwrap();
 
     assert_eq!(
         state_2.get_raw_class_hash_at(ContractAddress::from(1u128)).unwrap(),
