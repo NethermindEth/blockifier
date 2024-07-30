@@ -3,7 +3,6 @@ use std::env;
 
 use cairo_felt::Felt252;
 use cairo_lang_runner::casm_run::format_next_item;
-use cairo_native::cache::ProgramCache;
 use cairo_vm::serde::deserialize_program::{
     deserialize_array_of_bigint_hex, Attribute, HintParams, Identifier, ReferenceManager,
 };
@@ -60,7 +59,6 @@ pub fn execute_entry_point_call(
     state: &mut dyn State,
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
-    program_cache: &mut ProgramCache<'_, ClassHash>,
 ) -> EntryPointExecutionResult<CallInfo> {
     match contract_class {
         ContractClass::V0(contract_class) => {
@@ -70,7 +68,6 @@ pub fn execute_entry_point_call(
                 state,
                 resources,
                 context,
-                program_cache,
             )
         }
         ContractClass::V1(contract_class) => entry_point_execution::execute_entry_point_call(
@@ -80,9 +77,8 @@ pub fn execute_entry_point_call(
             resources,
             context,
         ),
-        ContractClass::V1Sierra(contract_class) => {
+        ContractClass::V1Native(contract_class) => {
             let mut state_wrapped = DynStateWrapper::new(state);
-
             let fallback = env::var("FALLBACK_ENABLED").unwrap_or(String::from("0")) == "1";
 
             match native_entry_point_execution::execute_entry_point_call(
@@ -91,7 +87,6 @@ pub fn execute_entry_point_call(
                 &mut state_wrapped,
                 resources,
                 context,
-                program_cache,
             ) {
                 Ok(res) => {
                     state_wrapped.commit().unwrap();
@@ -270,7 +265,6 @@ pub fn execute_deployment(
     ctor_context: ConstructorContext,
     constructor_calldata: Calldata,
     remaining_gas: u64,
-    program_cache: Option<&mut ProgramCache<'_, ClassHash>>,
 ) -> ConstructorEntryPointExecutionResult<CallInfo> {
     // Address allocation in the state is done before calling the constructor, so that it is
     // visible from it.
@@ -298,7 +292,6 @@ pub fn execute_deployment(
         ctor_context,
         constructor_calldata,
         remaining_gas,
-        program_cache,
     )
 }
 
