@@ -1,4 +1,3 @@
-use cairo_lang_sierra::ids::FunctionId;
 use cairo_lang_starknet_classes::contract_class::ContractEntryPoints;
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 
@@ -20,6 +19,11 @@ pub fn execute_entry_point_call(
 ) -> EntryPointExecutionResult<CallInfo> {
     let contract_entrypoints: &ContractEntryPoints = &contract_class.entry_points_by_type;
 
+    // Looks like this could be a lookup with just a hashmap
+    // The entry point selector
+    // The goal is the find the function id into the contract.
+    // Staying too close to the way it has been created?
+    // Could also make use of it to have three dictionaries
     let matching_entrypoint =
         match_entrypoint(call.entry_point_type, call.entry_point_selector, contract_entrypoints)?;
 
@@ -33,12 +37,8 @@ pub fn execute_entry_point_call(
     );
 
     println!("Blockifier-Native: running the Native Executor");
-    let result = run_native_executor(
-        &contract_class.executor,
-        &FunctionId::new(matching_entrypoint.function_idx.try_into().unwrap()),
-        call,
-        syscall_handler,
-    );
+    let result =
+        run_native_executor(&contract_class.executor, matching_entrypoint, call, syscall_handler);
     println!("Blockifier-Native: Native Executor finished running");
     result
 }
