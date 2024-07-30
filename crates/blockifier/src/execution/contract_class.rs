@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
+use std::ops::{Deref, Index};
 use std::sync::Arc;
 
 use cairo_felt::Felt252;
@@ -9,7 +9,8 @@ use cairo_lang_starknet_classes::casm_contract_class::{
     CasmContractClass, CasmContractEntryPoint, StarknetSierraCompilationError,
 };
 use cairo_lang_starknet_classes::contract_class::{
-    ContractClass as SierraContractClass, ContractEntryPoints as SierraContractEntryPoints,
+    ContractClass as SierraContractClass, ContractEntryPoint,
+    ContractEntryPoints as SierraContractEntryPoints,
 };
 use cairo_lang_starknet_classes::NestedIntList;
 use cairo_lang_utils::bigint::BigUintAsHex;
@@ -32,6 +33,8 @@ use starknet_api::deprecated_contract_class::{
     Program as DeprecatedProgram,
 };
 
+use super::entry_point::EntryPointExecutionResult;
+use super::errors::EntryPointExecutionError;
 use super::execution_utils::poseidon_hash_many_cost;
 use super::native::utils::contract_entrypoint_to_entrypoint_selector;
 use crate::abi::abi_utils::selector_from_name;
@@ -544,12 +547,14 @@ impl Deref for NativeContractClassV1 {
 
 impl NativeContractClassV1 {
     fn constructor_selector(&self) -> Option<EntryPointSelector> {
-        let entrypoint = self.deref().entry_points_by_type.constructor.first()?;
+        let entrypoint = self.entry_points_by_type.0.constructor.first()?;
         Some(contract_entrypoint_to_entrypoint_selector(entrypoint))
     }
 
     pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
-        fn compile(sierra_program: &SierraProgram) -> AotNativeExecutor {
+        // Compile the Sierra Program to native code and loads it into the process'
+        // memory space.
+        fn compile_and_load(sierra_program: &SierraProgram) -> AotNativeExecutor {
             let native_context = cairo_native::context::NativeContext::new();
             let native_program = native_context.compile(sierra_program, None).unwrap();
             AotNativeExecutor::from_native_module(native_program, OptLevel::Default)
@@ -562,11 +567,13 @@ impl NativeContractClassV1 {
         //   2. Refactoring the code on the Cairo mono-repo
 
         let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
-        let executor = compile(&sierra_program);
+        let executor = compile_and_load(&sierra_program);
 
         Ok(Self(Arc::new(NativeContractClassV1Inner {
             executor,
-            entry_points_by_type: sierra_contract_class.entry_points_by_type,
+            entry_points_by_type: NativeContractEntryPoints(
+                sierra_contract_class.entry_points_by_type,
+            ),
             sierra_program_raw: sierra_contract_class.sierra_program,
         })))
     }
@@ -577,7 +584,7 @@ impl NativeContractClassV1 {
         let sierra_contract_class = SierraContractClass {
             // todo(rodro): can we do better than cloning?
             sierra_program: self.sierra_program_raw.clone(),
-            entry_points_by_type: self.entry_points_by_type.clone(),
+            entry_points_by_type: self.entry_points_by_type.0.clone(),
             abi: None,
             sierra_program_debug_info: None,
             contract_class_version: String::default(),
@@ -585,17 +592,51 @@ impl NativeContractClassV1 {
 
         CasmContractClass::from_contract_class(sierra_contract_class, false, usize::MAX)
     }
+
+    pub fn get_entrypoint(
+        &self,
+        entry_point_type: EntryPointType,
+        entrypoint_selector: EntryPointSelector,
+    ) -> EntryPointExecutionResult<&ContractEntryPoint> {
+        let entrypoints = &self.entry_points_by_type[entry_point_type];
+
+        entrypoints
+            .iter()
+            .find(|entrypoint| {
+                contract_entrypoint_to_entrypoint_selector(entrypoint) == entrypoint_selector
+            })
+            .ok_or(EntryPointExecutionError::NativeExecutionError {
+                info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
+            })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+// Newtype such that we can index contract entry points by EntryPointType
+struct NativeContractEntryPoints(SierraContractEntryPoints);
+
+impl Index<EntryPointType> for NativeContractEntryPoints {
+    type Output = Vec<ContractEntryPoint>;
+
+    fn index(&self, index: EntryPointType) -> &Self::Output {
+        match index {
+            EntryPointType::Constructor => &self.0.constructor,
+            EntryPointType::External => &self.0.external,
+            EntryPointType::L1Handler => &self.0.l1_handler,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct NativeContractClassV1Inner {
     pub executor: AotNativeExecutor,
-    pub entry_points_by_type: SierraContractEntryPoints,
-    // The private entries are for the fallback mechanism
+    entry_points_by_type: NativeContractEntryPoints,
+    // Storing the raw sierra program to be able to fallback to the vm
     sierra_program_raw: Vec<BigUintAsHex>,
 }
 
-// Manual implementation as the executor has no comparison
+// The location where the compiled contract is loaded into memory will not
+// be the same therefore we exclude it from the comparison.
 impl PartialEq for NativeContractClassV1Inner {
     fn eq(&self, other: &Self) -> bool {
         self.entry_points_by_type == other.entry_points_by_type

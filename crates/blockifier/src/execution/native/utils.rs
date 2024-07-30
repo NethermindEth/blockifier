@@ -3,7 +3,7 @@ use std::hash::RandomState;
 
 use ark_ff::BigInt;
 use cairo_lang_sierra::ids::FunctionId;
-use cairo_lang_starknet_classes::contract_class::{ContractEntryPoint, ContractEntryPoints};
+use cairo_lang_starknet_classes::contract_class::ContractEntryPoint;
 use cairo_native::execution_result::ContractExecutionResult;
 use cairo_native::executor::AotNativeExecutor;
 use cairo_native::starknet::{ResourceBounds, SyscallResult, TxV2Info, U256};
@@ -12,7 +12,6 @@ use itertools::Itertools;
 use num_bigint::BigUint;
 use num_traits::ToBytes;
 use starknet_api::core::{ContractAddress, EntryPointSelector};
-use starknet_api::deprecated_contract_class::EntryPointType;
 use starknet_api::hash::StarkFelt;
 use starknet_api::state::StorageKey;
 use starknet_api::transaction::Resource;
@@ -34,37 +33,6 @@ pub mod test;
 // An arbitrary number, chosen to avoid accidentally aligning with actually calculated gas
 // To be deleted once cairo native gas handling can be used
 pub const NATIVE_GAS_PLACEHOLDER: u64 = 12;
-
-pub fn match_entrypoint(
-    entry_point_type: EntryPointType,
-    entrypoint_selector: EntryPointSelector,
-    contract_entrypoints: &ContractEntryPoints,
-) -> EntryPointExecutionResult<&ContractEntryPoint> {
-    let entrypoints = match entry_point_type {
-        EntryPointType::Constructor => &contract_entrypoints.constructor,
-        EntryPointType::External => &contract_entrypoints.external,
-        EntryPointType::L1Handler => &contract_entrypoints.l1_handler,
-    };
-
-    // This selector seems off, comparing strings seem to be a bad way
-    let cmp_selector_to_entrypoint =
-        |selector: EntryPointSelector, entrypoint: &ContractEntryPoint| {
-            let entrypoint_selector_str = entrypoint.selector.to_str_radix(16);
-            let padded_selector_str = format!(
-                "0x{}{}",
-                "0".repeat(64 - entrypoint_selector_str.len()),
-                entrypoint_selector_str
-            );
-            selector.0.to_string() == padded_selector_str
-        };
-
-    entrypoints
-        .iter()
-        .find(|entrypoint| cmp_selector_to_entrypoint(entrypoint_selector, entrypoint))
-        .ok_or(EntryPointExecutionError::NativeExecutionError {
-            info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
-        })
-}
 
 pub fn stark_felt_to_native_felt(stark_felt: StarkFelt) -> Felt {
     Felt::from_bytes_be_slice(stark_felt.bytes())
