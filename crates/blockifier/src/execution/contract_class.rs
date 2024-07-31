@@ -552,6 +552,21 @@ impl NativeContractClassV1 {
         Some(entrypoint.selector)
     }
 
+    /// Initialize a compiled contract class for native. The sierra_program and sierra_contract_class
+    /// need to be
+    pub fn new(
+        sierra_program: &SierraProgram,
+        executor: AotNativeExecutor,
+        sierra_contract_class: SierraContractClass,
+    ) -> Result<NativeContractClassV1, ProgramError> {
+        let contract =
+            NativeContractClassV1Inner::new(sierra_program, executor, sierra_contract_class);
+
+        Ok(Self(Arc::new(contract)))
+    }
+
+    /// Convenience function to construct a NativeContractClassV1 from a raw contract class.
+    /// If control over the compilation is desired use new instead.
     pub fn try_from_json_string(raw_contract_class: &str) -> Result<Self, ProgramError> {
         // Compile the Sierra Program to native code and loads it into the process'
         // memory space.
@@ -570,38 +585,7 @@ impl NativeContractClassV1 {
         let sierra_program = sierra_contract_class.extract_sierra_program().unwrap();
         let executor = compile_and_load(&sierra_program);
 
-        // Even though we have the index of the function, we actually need it's function id to be able to work with
-        // native in debug mode. It renames the functions.
-        let lookup_fid: HashMap<u64, FunctionId> =
-            HashMap::from_iter(sierra_program.funcs.into_iter().map(|fid| (fid.id.id, fid.id)));
-
-        fn convert(lookup: &HashMap<u64, FunctionId>, cep: ContractEntryPoint) -> NativeEntryPoint {
-            // TODO(xrvdg) handle debugging
-            let fid = lookup.get(&cep.function_idx.try_into().unwrap()).unwrap();
-            let selector = contract_entrypoint_to_entrypoint_selector(&cep);
-            NativeEntryPoint { selector, id: fid.clone() }
-        }
-
-        fn convert2(
-            lookup: &HashMap<u64, FunctionId>,
-            sep: SierraContractEntryPoints,
-        ) -> NativeContractEntryPoints {
-            NativeContractEntryPoints {
-                constructor: sep.constructor.into_iter().map(|c| convert(lookup, c)).collect(),
-                external: sep.external.into_iter().map(|c| convert(lookup, c)).collect(),
-                l1_handler: sep.l1_handler.into_iter().map(|c| convert(lookup, c)).collect(),
-            }
-        }
-
-        Ok(Self(Arc::new(NativeContractClassV1Inner {
-            executor,
-            entry_points_by_type: convert2(
-                &lookup_fid,
-                sierra_contract_class.entry_points_by_type.clone(),
-            ),
-            sierra_program_raw: sierra_contract_class.sierra_program,
-            fallback_entry_points_by_type: sierra_contract_class.entry_points_by_type,
-        })))
+        Self::new(&sierra_program, executor, sierra_contract_class)
     }
 
     pub fn to_casm_contract_class(
@@ -629,10 +613,55 @@ impl NativeContractClassV1 {
         entrypoints
             .iter()
             .find(|entrypoint| entrypoint.selector == entrypoint_selector)
+            .map(|op| &op.id)
             .ok_or(EntryPointExecutionError::NativeExecutionError {
                 info: format!("Entrypoint selector {} not found", entrypoint_selector.0),
             })
-            .map(|op| &op.id)
+    }
+}
+
+#[derive(Debug)]
+pub struct NativeContractClassV1Inner {
+    pub executor: AotNativeExecutor,
+    entry_points_by_type: NativeContractEntryPoints,
+    // Storing the raw sierra program to be able to fallback to the vm
+    sierra_program_raw: Vec<BigUintAsHex>,
+    fallback_entry_points_by_type: SierraContractEntryPoints,
+}
+
+impl NativeContractClassV1Inner {
+    /// See NativeContractClassV1::new
+    fn new(
+        sierra_program: &SierraProgram,
+        executor: AotNativeExecutor,
+        sierra_contract_class: SierraContractClass,
+    ) -> Self {
+        // The supplied (compiled) sierra program might have been populated with debug info and this
+        // affects the ABI, because the debug info is appended to the function name and the
+        // function name is what is used by Cairo Native to lookup the function.
+        // Therefore it's not enough to know the function index and we need enrich the contract
+        // entry point with FunctionIds from SierraProgram.
+        let lookup_fid: HashMap<u64, &FunctionId> =
+            HashMap::from_iter(sierra_program.funcs.iter().map(|fid| (fid.id.id, &fid.id)));
+
+        NativeContractClassV1Inner {
+            executor,
+            entry_points_by_type: NativeContractEntryPoints::from(
+                &lookup_fid,
+                &sierra_contract_class.entry_points_by_type,
+            ),
+            sierra_program_raw: sierra_contract_class.sierra_program,
+            fallback_entry_points_by_type: sierra_contract_class.entry_points_by_type,
+        }
+    }
+}
+
+// The location where the compiled contract is loaded into memory will not
+// be the same therefore we exclude it from the comparison.
+impl PartialEq for NativeContractClassV1Inner {
+    fn eq(&self, other: &Self) -> bool {
+        self.entry_points_by_type == other.entry_points_by_type
+            && self.sierra_program_raw == other.sierra_program_raw
     }
 }
 
@@ -644,10 +673,21 @@ struct NativeContractEntryPoints {
     l1_handler: Vec<NativeEntryPoint>,
 }
 
-#[derive(Debug, PartialEq)]
-struct NativeEntryPoint {
-    selector: EntryPointSelector,
-    id: FunctionId,
+impl NativeContractEntryPoints {
+    fn from(
+        lookup: &HashMap<u64, &FunctionId>,
+        sep: &SierraContractEntryPoints,
+    ) -> NativeContractEntryPoints {
+        NativeContractEntryPoints {
+            constructor: sep
+                .constructor
+                .iter()
+                .map(|c| NativeEntryPoint::from(lookup, c))
+                .collect(),
+            external: sep.external.iter().map(|c| NativeEntryPoint::from(lookup, c)).collect(),
+            l1_handler: sep.l1_handler.iter().map(|c| NativeEntryPoint::from(lookup, c)).collect(),
+        }
+    }
 }
 
 impl Index<EntryPointType> for NativeContractEntryPoints {
@@ -662,20 +702,18 @@ impl Index<EntryPointType> for NativeContractEntryPoints {
     }
 }
 
-#[derive(Debug)]
-pub struct NativeContractClassV1Inner {
-    pub executor: AotNativeExecutor,
-    entry_points_by_type: NativeContractEntryPoints,
-    // Storing the raw sierra program to be able to fallback to the vm
-    sierra_program_raw: Vec<BigUintAsHex>,
-    fallback_entry_points_by_type: SierraContractEntryPoints,
+#[derive(Debug, PartialEq)]
+struct NativeEntryPoint {
+    selector: EntryPointSelector,
+    id: FunctionId,
 }
 
-// The location where the compiled contract is loaded into memory will not
-// be the same therefore we exclude it from the comparison.
-impl PartialEq for NativeContractClassV1Inner {
-    fn eq(&self, other: &Self) -> bool {
-        self.entry_points_by_type == other.entry_points_by_type
-            && self.sierra_program_raw == other.sierra_program_raw
+impl NativeEntryPoint {
+    fn from(lookup: &HashMap<u64, &FunctionId>, cep: &ContractEntryPoint) -> NativeEntryPoint {
+        // TODO(xrvdg) handle debugging
+        let &fid = lookup.get(&cep.function_idx.try_into().unwrap()).unwrap();
+        let selector = contract_entrypoint_to_entrypoint_selector(cep);
+        // This clone can be removed if we strengthen the assumption
+        NativeEntryPoint { selector, id: fid.clone() }
     }
 }

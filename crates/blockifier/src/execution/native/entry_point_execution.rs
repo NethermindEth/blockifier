@@ -16,7 +16,7 @@ pub fn execute_entry_point_call(
     resources: &mut ExecutionResources,
     context: &mut EntryPointExecutionContext,
 ) -> EntryPointExecutionResult<CallInfo> {
-    let matching_entrypoint =
+    let function_id =
         contract_class.get_entrypoint(call.entry_point_type, call.entry_point_selector)?;
 
     let syscall_handler: NativeSyscallHandler<'_> = NativeSyscallHandler::new(
@@ -29,8 +29,7 @@ pub fn execute_entry_point_call(
     );
 
     println!("Blockifier-Native: running the Native Executor");
-    let result =
-        run_native_executor(&contract_class.executor, matching_entrypoint, call, syscall_handler);
+    let result = run_native_executor(&contract_class.executor, function_id, call, syscall_handler);
     println!("Blockifier-Native: Native Executor finished running");
     result
 }
