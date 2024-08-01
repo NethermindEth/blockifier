@@ -16,7 +16,6 @@ use cairo_lang_starknet_classes::contract_class::{
 use cairo_lang_starknet_classes::NestedIntList;
 use cairo_lang_utils::bigint::BigUintAsHex;
 use cairo_native::executor::AotNativeExecutor;
-use cairo_native::OptLevel;
 use cairo_vm::serde::deserialize_program::{
     ApTracking, FlowTrackingData, HintParams, ReferenceManager,
 };
@@ -136,7 +135,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
+        // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -570,34 +569,6 @@ impl NativeContractClassV1 {
             NativeContractClassV1Inner::new(sierra_program, executor, sierra_contract_class)?;
 
         Ok(Self(Arc::new(contract)))
-    }
-
-    /// Convenience function to construct a NativeContractClassV1 from a raw contract class.
-    /// If control over the compilation is desired use [Self::new] instead.
-    pub fn try_from_json_string(
-        raw_contract_class: &str,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Compile the Sierra Program to native code and loads it into the process'
-        // memory space.
-        fn compile_and_load(
-            sierra_program: &SierraProgram,
-        ) -> Result<AotNativeExecutor, cairo_native::error::Error> {
-            let native_context = cairo_native::context::NativeContext::new();
-            let native_program = native_context.compile(sierra_program, None)?;
-            Ok(AotNativeExecutor::from_native_module(native_program, OptLevel::Default))
-        }
-
-        let sierra_contract_class: SierraContractClass = serde_json::from_str(raw_contract_class)?;
-
-        // todo(rodro): we are having two instances of a sierra program, one it's object form
-        // and another in its felt encoded form. This can be avoided by either:
-        //   1. Having access to the encoding/decoding functions
-        //   2. Refactoring the code on the Cairo mono-repo
-
-        let sierra_program = sierra_contract_class.extract_sierra_program()?;
-        let executor = compile_and_load(&sierra_program)?;
-
-        Ok(Self::new(&sierra_program, executor, sierra_contract_class)?)
     }
 
     pub fn to_casm_contract_class(
