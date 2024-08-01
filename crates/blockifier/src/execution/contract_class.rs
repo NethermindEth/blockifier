@@ -136,7 +136,7 @@ impl ContractClassV0 {
             + self.n_builtins()
             + self.bytecode_length()
             + 1; // Hinted class hash.
-        // The hashed data size is approximately the number of hashes (invoked in hash chains).
+                 // The hashed data size is approximately the number of hashes (invoked in hash chains).
         let n_steps = constants::N_STEPS_PER_PEDERSEN * hashed_data_size;
 
         ExecutionResources {
@@ -655,9 +655,12 @@ impl NativeContractClassV1Inner {
         // function name is what is used by Cairo Native to lookup the function.
         // Therefore it's not enough to know the function index and we need enrich the contract
         // entry point with FunctionIds from SierraProgram.
-        let lookup_fid: HashMap<usize, &FunctionId> = HashMap::from_iter(
-            sierra_program.funcs.iter().map(|fid| (fid.id.id as usize, &fid.id)),
-        );
+        let lookup_fid: HashMap<usize, &FunctionId> =
+            HashMap::from_iter(sierra_program.funcs.iter().map(|fid| {
+                // This exception should never occur as the id is also in [SierraContractClass]
+                let id: usize = fid.id.id.try_into().expect("function id exceeds usize");
+                (id, &fid.id)
+            }));
 
         Ok(NativeContractClassV1Inner {
             executor,
