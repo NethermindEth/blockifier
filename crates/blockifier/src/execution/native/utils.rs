@@ -64,7 +64,6 @@ pub fn run_native_executor(
     };
 
     let execution_result = native_executor.invoke_contract_dynamic(
-        // TODO(xrvdg) replace this unwrap by an error. Most likely the previous one
         function_id,
         &stark_felts_to_native_felts(&call.calldata.0),
         Some(call.initial_gas.into()),
