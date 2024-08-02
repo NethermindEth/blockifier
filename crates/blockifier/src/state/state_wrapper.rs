@@ -14,6 +14,8 @@ use crate::state::state_api::{State, StateReader, StateResult};
 #[path = "state_wrapper_test.rs"]
 mod test;
 
+/// DynStateWrapper is a wrapper that works as a TransactionState, but using only the dyn State
+/// trait. So it can be used for fallback mechanism.
 pub struct DynStateWrapper<'a> {
     pub state: &'a mut dyn State,
 
@@ -36,6 +38,7 @@ impl<'a> DynStateWrapper<'a> {
         }
     }
 
+    /// Commits the update to the state, and clears the updates.
     pub fn commit(&mut self) -> StateResult<()> {
         for ((contract_address, key), value) in &self.storage_updates {
             self.state.set_storage_at(*contract_address, *key, *value)?
@@ -64,6 +67,7 @@ impl<'a> DynStateWrapper<'a> {
         Ok(())
     }
 
+    /// Aborts the updates (clears the updates).
     pub fn abort(&mut self) {
         self.storage_updates.clear();
         self.nonce_updates.clear();

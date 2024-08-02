@@ -78,6 +78,7 @@ pub fn execute_entry_point_call(
             context,
         ),
         ContractClass::V1Native(contract_class) => {
+            // Wrap the state into a DynStateWrapper to be transactional
             let mut state_wrapped = DynStateWrapper::new(state);
             let fallback = env::var("FALLBACK_ENABLED").unwrap_or(String::from("0")) == "1";
 
@@ -89,6 +90,7 @@ pub fn execute_entry_point_call(
                 context,
             ) {
                 Ok(res) => {
+                    // If everything went well, commit the changes to the state
                     state_wrapped.commit().unwrap();
 
                     Ok(res)
@@ -101,6 +103,7 @@ pub fn execute_entry_point_call(
                         })?;
                     let contract_class_v1: ContractClassV1 =
                         casm_contract_class.try_into().unwrap();
+                    // Use old state if native execution failed
                     entry_point_execution::execute_entry_point_call(
                         call,
                         contract_class_v1,
