@@ -5,7 +5,6 @@ use std::sync::Arc;
 use cairo_felt::Felt252;
 use cairo_lang_casm::hints::Hint;
 use cairo_lang_sierra::ids::FunctionId;
-use cairo_lang_sierra::program::Program as SierraProgram;
 use cairo_lang_starknet_classes::casm_contract_class::{
     CasmContractClass, CasmContractEntryPoint, StarknetSierraCompilationError,
 };
@@ -561,12 +560,10 @@ impl NativeContractClassV1 {
     /// executor must be derived from sierra_program which in turn must be derived from
     /// sierra_contract_class.
     pub fn new(
-        sierra_program: &SierraProgram,
         executor: AotNativeExecutor,
         sierra_contract_class: SierraContractClass,
     ) -> Result<NativeContractClassV1, NativeEntryPointError> {
-        let contract =
-            NativeContractClassV1Inner::new(sierra_program, executor, sierra_contract_class)?;
+        let contract = NativeContractClassV1Inner::new(executor, sierra_contract_class)?;
 
         Ok(Self(Arc::new(contract)))
     }
@@ -616,10 +613,12 @@ pub struct NativeContractClassV1Inner {
 impl NativeContractClassV1Inner {
     /// See [NativeContractClassV1::new]
     fn new(
-        sierra_program: &SierraProgram,
         executor: AotNativeExecutor,
         sierra_contract_class: SierraContractClass,
     ) -> Result<Self, NativeEntryPointError> {
+        // This exception should never occur as it was also used to create the AotNativeExecutor
+        let sierra_program =
+            sierra_contract_class.extract_sierra_program().expect("can't extract sierra program");
         // Note [Cairo Native ABI]
         // The supplied (compiled) sierra program might have been populated with debug info and this
         // affects the ABI, because the debug info is appended to the function name and the
