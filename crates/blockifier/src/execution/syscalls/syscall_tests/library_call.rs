@@ -119,7 +119,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999847020, 9999745020),
+        initial_gas: if_sierra(9999725020, 9999745020),
         ..trivial_external_entry_point_new(test_contract)
     };
     let library_entry_point = CallEntryPoint {
@@ -134,12 +134,12 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
         class_hash: Some(test_class_hash),
         code_address: None,
         call_type: CallType::Delegate,
-        initial_gas: if_sierra(9999874550, 9999823550),
+        initial_gas: if_sierra(9999813550, 9999823550),
         ..trivial_external_entry_point_new(test_contract)
     };
     let storage_entry_point = CallEntryPoint {
         calldata: calldata![felt!(key), felt!(value)],
-        initial_gas: if_sierra(9999874538, 9999656870),
+        initial_gas: if_sierra(9999752538, 9999656870),
         ..nested_storage_entry_point
     };
 

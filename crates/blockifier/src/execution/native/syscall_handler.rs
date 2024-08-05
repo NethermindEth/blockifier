@@ -41,6 +41,7 @@ use crate::execution::syscalls::hint_processor::{
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
+
 pub struct NativeSyscallHandler<'state> {
     // Input for execution
     pub state: &'state mut dyn State,
@@ -117,14 +118,41 @@ impl<'state> NativeSyscallHandler<'state> {
         // change the remaining gas value
         *remaining_gas = u128::from(remaining_gas_u64);
     }
+
+    // We need to have this function since in VM we have `execute_syscall` method, which is handling
+    // all gas-related logics in the native, syscalls are called directly, so we need to
+    // implement this logic here
+    pub fn substract_syscall_gas_cost(
+        &mut self,
+        remaining_gas: &mut u128,
+        syscall_gas_cost: u64,
+    ) -> SyscallResult<()> {
+        // Refund `SYSCALL_BASE_GAS_COST` as it was pre-charged.
+        let required_gas =
+            u128::from(syscall_gas_cost - self.execution_context.gas_costs().syscall_base_gas_cost);
+
+        if *remaining_gas < required_gas {
+            //  Out of gas failure.
+            return Err(vec![Felt::from_hex(OUT_OF_GAS_ERROR).unwrap()]);
+        }
+
+        *remaining_gas -= required_gas;
+
+        Ok(())
+    }
 }
 
 impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     fn get_block_hash(
         &mut self,
         block_number: u64,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().get_block_hash_gas_cost,
+        )?;
+
         if self.execution_context.execution_mode == ExecutionMode::Validate {
             let err = SyscallExecutionError::InvalidSyscallInExecutionMode {
                 syscall_name: "get_block_hash".to_string(),
@@ -163,7 +191,12 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         }
     }
 
-    fn get_execution_info(&mut self, _remaining_gas: &mut u128) -> SyscallResult<ExecutionInfo> {
+    fn get_execution_info(&mut self, remaining_gas: &mut u128) -> SyscallResult<ExecutionInfo> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().get_execution_info_gas_cost,
+        )?;
+
         let block_info = &self.execution_context.tx_context.block_context.block_info;
         let native_block_info: BlockInfo = if self.execution_context.execution_mode
             == ExecutionMode::Validate
@@ -223,8 +256,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
 
     fn get_execution_info_v2(
         &mut self,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<ExecutionInfoV2> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().get_execution_info_gas_cost,
+        )?;
+
         // Get Block Info
         let block_info = &self.execution_context.tx_context.block_context.block_info;
         let native_block_info: BlockInfo = if self.execution_context.execution_mode
@@ -308,6 +346,11 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         deploy_from_zero: bool,
         remaining_gas: &mut u128,
     ) -> SyscallResult<(Felt, Vec<Felt>)> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().deploy_gas_cost,
+        )?;
+
         let deployer_address =
             if deploy_from_zero { ContractAddress::default() } else { self.contract_address };
 
@@ -363,7 +406,12 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         Ok((contract_address_felt, return_data))
     }
 
-    fn replace_class(&mut self, class_hash: Felt, _remaining_gas: &mut u128) -> SyscallResult<()> {
+    fn replace_class(&mut self, class_hash: Felt, remaining_gas: &mut u128) -> SyscallResult<()> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().replace_class_gas_cost,
+        )?;
+
         let class_hash = ClassHash(class_hash);
         let contract_class = self
             .state
@@ -391,6 +439,11 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         calldata: &[Felt],
         remaining_gas: &mut u128,
     ) -> SyscallResult<Vec<Felt>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().library_call_gas_cost,
+        )?;
+
         let class_hash = ClassHash(class_hash);
 
         let wrapper_calldata = Calldata(Arc::new(calldata.to_vec()));
@@ -422,6 +475,11 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         calldata: &[Felt],
         remaining_gas: &mut u128,
     ) -> SyscallResult<Vec<Felt>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().call_contract_gas_cost,
+        )?;
+
         let contract_address = ContractAddress::try_from(address)
             .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
@@ -461,8 +519,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         _address_domain: u32,
         address: Felt,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Felt> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().storage_read_gas_cost,
+        )?;
+
         let key = StorageKey(
             PatriciaKey::try_from(address).map_err(|e| encode_str_as_felts(&e.to_string()))?,
         );
@@ -481,8 +544,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         _address_domain: u32,
         address: Felt,
         value: Felt,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().storage_write_gas_cost,
+        )?;
+
         let key = StorageKey(
             PatriciaKey::try_from(address).map_err(|e| encode_str_as_felts(&e.to_string()))?,
         );
@@ -498,8 +566,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         keys: &[Felt],
         data: &[Felt],
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().emit_event_gas_cost,
+        )?;
+
         let order = self.execution_context.n_emitted_events;
         let event = EventContent {
             keys: keys.iter().copied().map(EventKey).collect(),
@@ -525,6 +598,11 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         payload: &[Felt],
         _remaining_gas: &mut u128,
     ) -> SyscallResult<()> {
+        self.substract_syscall_gas_cost(
+            _remaining_gas,
+            self.execution_context.gas_costs().send_message_to_l1_gas_cost,
+        )?;
+
         let order = self.execution_context.n_sent_messages_to_l1;
 
         self.l2_to_l1_messages.push(OrderedL2ToL1Message {
@@ -542,6 +620,11 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
     }
 
     fn keccak(&mut self, input: &[u64], remaining_gas: &mut u128) -> SyscallResult<U256> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().keccak_gas_cost,
+        )?;
+
         const KECCAK_FULL_RATE_IN_WORDS: usize = 17;
 
         let length = input.len();
@@ -588,8 +671,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         x: U256,
         y: U256,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256k1Point>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256k1_new_gas_cost,
+        )?;
+
         Secp256Point::new(x, y).map(|op| op.map(|p| p.into()))
     }
 
@@ -597,8 +685,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         p0: Secp256k1Point,
         p1: Secp256k1Point,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256k1_add_gas_cost,
+        )?;
+
         Ok(Secp256Point::add(p0.into(), p1.into()).into())
     }
 
@@ -606,8 +699,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         p: Secp256k1Point,
         m: U256,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256k1Point> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256k1_mul_gas_cost,
+        )?;
+
         Ok(Secp256Point::mul(p.into(), m).into())
     }
 
@@ -615,16 +713,26 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         x: U256,
         y_parity: bool,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256k1Point>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256k1_get_point_from_x_gas_cost,
+        )?;
+
         Secp256Point::get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256k1_get_xy(
         &mut self,
         p: Secp256k1Point,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<(U256, U256)> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256k1_get_xy_gas_cost,
+        )?;
+
         Ok((p.x, p.y))
     }
 
@@ -632,8 +740,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         x: U256,
         y: U256,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256r1Point>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256r1_new_gas_cost,
+        )?;
+
         Secp256Point::new(x, y).map(|op| op.map(|p| p.into()))
     }
 
@@ -641,8 +754,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         p0: Secp256r1Point,
         p1: Secp256r1Point,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256r1_add_gas_cost,
+        )?;
+
         Ok(Secp256Point::add(p0.into(), p1.into()).into())
     }
 
@@ -650,8 +768,13 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         p: Secp256r1Point,
         m: U256,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Secp256r1Point> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256r1_mul_gas_cost,
+        )?;
+
         Ok(Secp256Point::mul(p.into(), m).into())
     }
 
@@ -659,16 +782,26 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         &mut self,
         x: U256,
         y_parity: bool,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<Option<Secp256r1Point>> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256r1_get_point_from_x_gas_cost,
+        )?;
+
         Secp256Point::get_point_from_x(x, y_parity).map(|op| op.map(|p| p.into()))
     }
 
     fn secp256r1_get_xy(
         &mut self,
         p: Secp256r1Point,
-        _remaining_gas: &mut u128,
+        remaining_gas: &mut u128,
     ) -> SyscallResult<(U256, U256)> {
+        self.substract_syscall_gas_cost(
+            remaining_gas,
+            self.execution_context.gas_costs().secp256r1_get_xy_gas_cost,
+        )?;
+
         Ok((p.x, p.y))
     }
 }
