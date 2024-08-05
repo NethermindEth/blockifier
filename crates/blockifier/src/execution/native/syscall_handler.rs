@@ -384,8 +384,16 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         let call_info = entry_point
             .execute(self.state, self.execution_resources, self.execution_context)
             .map_err(|e| encode_str_as_felts(&e.to_string()))?;
-
         let retdata = call_info.execution.retdata.0.clone();
+
+        if call_info.execution.failed {
+            // In VM it's wrapped into `SyscallExecutionError::SyscallError`
+            return Err(retdata);
+        }
+
+        let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
+        update_remaining_gas(&mut remaining_gas_u64, &call_info);
+        *remaining_gas = u128::from(remaining_gas_u64);
 
         self.inner_calls.push(call_info);
 
@@ -495,7 +503,6 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         .map_err(|e| encode_str_as_felts(&e.to_string()))?;
 
         self.events.push(OrderedEvent { order, event });
-
         self.execution_context.n_emitted_events += 1;
 
         Ok(())

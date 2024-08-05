@@ -139,7 +139,7 @@ fn test_nested_library_call(test_contract: FeatureContract, expected_gas: u64) {
     };
     let storage_entry_point = CallEntryPoint {
         calldata: calldata![felt!(key), felt!(value)],
-        initial_gas: if_sierra(9999874550, 9999656870),
+        initial_gas: if_sierra(9999874538, 9999656870),
         ..nested_storage_entry_point
     };
 
