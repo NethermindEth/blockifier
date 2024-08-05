@@ -14,7 +14,7 @@ use crate::context::ChainInfo;
 use crate::execution::call_info::{CallExecution, CallInfo, Retdata};
 use crate::execution::entry_point::{CallEntryPoint, CallType};
 use crate::execution::native::utils::NATIVE_GAS_PLACEHOLDER;
-use crate::execution::syscalls::syscall_tests::{
+use crate::execution::syscalls::syscall_tests::consts::{
     REQUIRED_GAS_LIBRARY_CALL_TEST, REQUIRED_GAS_STORAGE_READ_WRITE_TEST,
 };
 use crate::execution::syscalls::SyscallSelector;

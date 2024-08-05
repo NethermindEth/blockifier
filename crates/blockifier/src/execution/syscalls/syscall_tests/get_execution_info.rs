@@ -17,7 +17,7 @@ use crate::context::ChainInfo;
 use crate::execution::common_hints::ExecutionMode;
 use crate::execution::entry_point::CallEntryPoint;
 use crate::execution::syscalls::hint_processor::{L1_GAS, L2_GAS};
-use crate::execution::syscalls::syscall_tests::{
+use crate::execution::syscalls::syscall_tests::utils::{
     assert_consistent_contract_version, verify_compiler_version,
 };
 use crate::nonce;
