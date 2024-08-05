@@ -113,7 +113,7 @@ impl<'state> NativeSyscallHandler<'state> {
         let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
 
         // pass the reference to the function
-        update_remaining_gas(&mut remaining_gas_u64, &call_info);
+        update_remaining_gas(&mut remaining_gas_u64, call_info);
 
         // change the remaining gas value
         *remaining_gas = u128::from(remaining_gas_u64);
