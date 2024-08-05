@@ -37,6 +37,7 @@ use crate::execution::execution_utils::{execute_deployment, max_fee_for_executio
 use crate::execution::syscalls::exceeds_event_size_limit;
 use crate::execution::syscalls::hint_processor::{
     SyscallExecutionError, BLOCK_NUMBER_OUT_OF_RANGE_ERROR, INVALID_INPUT_LENGTH_ERROR,
+    OUT_OF_GAS_ERROR,
 };
 use crate::state::state_api::State;
 use crate::transaction::objects::TransactionInfo;
@@ -82,6 +83,39 @@ impl<'state> NativeSyscallHandler<'state> {
             storage_read_values: Vec::new(),
             accessed_storage_keys: HashSet::new(),
         }
+    }
+
+    pub fn execute_inner_call(
+        &mut self,
+        entry_point: CallEntryPoint,
+        remaining_gas: &mut u128,
+    ) -> SyscallResult<CallInfo> {
+        let call_info = entry_point
+            .execute(self.state, self.execution_resources, self.execution_context)
+            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
+        let retdata = call_info.execution.retdata.0.clone();
+
+        if call_info.execution.failed {
+            // In VM it's wrapped into `SyscallExecutionError::SyscallError`
+            return Err(retdata);
+        }
+
+        self.update_remaining_gas(remaining_gas, &call_info);
+
+        self.inner_calls.push(call_info.clone());
+
+        Ok(call_info)
+    }
+
+    pub fn update_remaining_gas(&mut self, remaining_gas: &mut u128, call_info: &CallInfo) {
+        // create a new variable with converted type
+        let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
+
+        // pass the reference to the function
+        update_remaining_gas(&mut remaining_gas_u64, &call_info);
+
+        // change the remaining gas value
+        *remaining_gas = u128::from(remaining_gas_u64);
     }
 }
 
@@ -319,14 +353,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         )
         .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
-        // create a new variable with converted type as written above
-        let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
-
-        // pass the reference to the function
-        update_remaining_gas(&mut remaining_gas_u64, &call_info);
-
-        // change the remaining gas value
-        *remaining_gas = remaining_gas_u64.into();
+        self.update_remaining_gas(remaining_gas, &call_info);
 
         let return_data = call_info.execution.retdata.0[..].to_vec();
         let contract_address_felt = Felt::from(calculated_contract_address);
@@ -381,21 +408,9 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             initial_gas: u64::try_from(*remaining_gas).unwrap(),
         };
 
-        let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
-            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
-        let retdata = call_info.execution.retdata.0.clone();
-
-        if call_info.execution.failed {
-            // In VM it's wrapped into `SyscallExecutionError::SyscallError`
-            return Err(retdata);
-        }
-
-        let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
-        update_remaining_gas(&mut remaining_gas_u64, &call_info);
-        *remaining_gas = u128::from(remaining_gas_u64);
-
-        self.inner_calls.push(call_info);
+        let retdata = self
+            .execute_inner_call(entry_point, remaining_gas)
+            .map(|call_info| call_info.execution.retdata.0.clone())?;
 
         Ok(retdata)
     }
@@ -435,13 +450,9 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             initial_gas: u64::try_from(*remaining_gas).unwrap(),
         };
 
-        let call_info = entry_point
-            .execute(self.state, self.execution_resources, self.execution_context)
-            .map_err(|e| encode_str_as_felts(&e.to_string()))?;
-
-        let retdata = call_info.execution.retdata.0.clone();
-
-        self.inner_calls.push(call_info);
+        let retdata = self
+            .execute_inner_call(entry_point, remaining_gas)
+            .map(|call_info| call_info.execution.retdata.0.clone())?;
 
         Ok(retdata)
     }
@@ -530,19 +541,34 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         Ok(())
     }
 
-    fn keccak(&mut self, input: &[u64], _remaining_gas: &mut u128) -> SyscallResult<U256> {
-        const CHUNK_SIZE: usize = 17;
-        let length = input.len();
+    fn keccak(&mut self, input: &[u64], remaining_gas: &mut u128) -> SyscallResult<U256> {
+        const KECCAK_FULL_RATE_IN_WORDS: usize = 17;
 
-        if length % CHUNK_SIZE != 0 {
+        let length = input.len();
+        let (n_rounds, remainder) = num_integer::div_rem(length, KECCAK_FULL_RATE_IN_WORDS);
+
+        if remainder != 0 {
+            // In VM this error is wrapped into `SyscallExecutionError::SyscallError`
             return Err(vec![Felt::from_hex(INVALID_INPUT_LENGTH_ERROR).unwrap()]);
         }
 
-        let n_chunks = length / CHUNK_SIZE;
-        let mut state = [0u64; 25];
+        // TODO(Ori, 1/2/2024): Write an indicative expect message explaining why the conversion
+        // works.
+        let n_rounds_as_u64 = u64::try_from(n_rounds).expect("Failed to convert usize to u64.");
+        let gas_cost = u128::from(
+            n_rounds_as_u64 * self.execution_context.gas_costs().keccak_round_cost_gas_cost,
+        );
 
-        for i in 0..n_chunks {
-            let chunk = &input[i * CHUNK_SIZE..(i + 1) * CHUNK_SIZE];
+        if gas_cost > *remaining_gas {
+            // In VM this error is wrapped into `SyscallExecutionError::SyscallError`
+            return Err(vec![Felt::from_hex(OUT_OF_GAS_ERROR).unwrap()]);
+        }
+        *remaining_gas -= gas_cost;
+
+        // TODO: do we need to have syscall counter?
+
+        let mut state = [0u64; 25];
+        for chunk in input.chunks(KECCAK_FULL_RATE_IN_WORDS) {
             for (i, val) in chunk.iter().enumerate() {
                 state[i] ^= val;
             }
