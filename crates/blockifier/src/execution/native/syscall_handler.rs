@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use ark_ec::short_weierstrass::{Affine, Projective, SWCurveConfig};
 use cairo_native::starknet::{
-    BlockInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point, StarknetSyscallHandler,
-    SyscallResult, TxInfo, TxV2Info, U256,
+    BlockInfo, ExecutionInfo, ExecutionInfoV2, Secp256k1Point, Secp256r1Point,
+    StarknetSyscallHandler, SyscallResult, TxInfo, TxV2Info, U256,
 };
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
 use num_traits::{ToPrimitive, Zero};
@@ -110,6 +110,10 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             // unwrap
             let out_of_range_felt = Felt::from_hex(BLOCK_NUMBER_OUT_OF_RANGE_ERROR).unwrap();
 
+            // This error is wrapped into a `SyscallExecutionError::SyscallError` in the VM
+            // implementation, but here it would be more convenient to return it directly, since
+            // wrapping it like VM does will result in a double encoding to felts, which adds extra
+            // layer of complication
             return Err(vec![out_of_range_felt]);
         }
 
@@ -125,11 +129,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         }
     }
 
-    // TODO: This method is untested!!!
-    fn get_execution_info(
-        &mut self,
-        _remaining_gas: &mut u128,
-    ) -> SyscallResult<cairo_native::starknet::ExecutionInfo> {
+    fn get_execution_info(&mut self, _remaining_gas: &mut u128) -> SyscallResult<ExecutionInfo> {
         let block_info = &self.execution_context.tx_context.block_context.block_info;
         let native_block_info: BlockInfo = if self.execution_context.execution_mode
             == ExecutionMode::Validate
@@ -178,7 +178,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
         let contract_address = contract_address_to_native_felt(self.contract_address);
         let entry_point_selector = self.entry_point_selector;
 
-        Ok(cairo_native::starknet::ExecutionInfo {
+        Ok(ExecutionInfo {
             block_info: native_block_info,
             tx_info: native_tx_info,
             caller_address,
@@ -278,9 +278,7 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             if deploy_from_zero { ContractAddress::default() } else { self.contract_address };
 
         let class_hash = ClassHash(class_hash);
-
         let wrapper_calldata = Calldata(Arc::new(calldata.to_vec()));
-
         let calculated_contract_address = calculate_contract_address(
             ContractAddressSalt(contract_address_salt),
             class_hash,
@@ -302,12 +300,35 @@ impl<'state> StarknetSyscallHandler for &mut NativeSyscallHandler<'state> {
             self.execution_context,
             ctor_context,
             wrapper_calldata,
+            // Warning: converting of reference would create a new reference to different data,
+            // example:
+            //     let mut a: u128 = 1;
+            //     let a_ref: &mut u128 = &mut a;
+            //
+            //     let mut b: u64 = u64::try_from(*a_ref).unwrap();
+            //
+            //     assert_eq!(b, 1);
+            //
+            //     b += 1;
+            //
+            //     assert_eq!(b, 2);
+            //     assert_eq!(a, 1);
+            // in this case we don't pass a reference, so everything is OK, but still can cause
+            // conversion issues
             u64::try_from(*remaining_gas).unwrap(),
         )
         .map_err(|error| encode_str_as_felts(&error.to_string()))?;
 
-        let return_data = call_info.execution.retdata.0[..].to_vec();
+        // create a new variable with converted type as written above
+        let mut remaining_gas_u64 = u64::try_from(*remaining_gas).unwrap();
 
+        // pass the reference to the function
+        update_remaining_gas(&mut remaining_gas_u64, &call_info);
+
+        // change the remaining gas value
+        *remaining_gas = remaining_gas_u64.into();
+
+        let return_data = call_info.execution.retdata.0[..].to_vec();
         let contract_address_felt = Felt::from(calculated_contract_address);
 
         self.inner_calls.push(call_info);
@@ -724,6 +745,8 @@ struct Secp256Point<Config> {
 }
 
 use std::convert::From;
+
+use crate::transaction::transaction_utils::update_remaining_gas;
 
 impl From<Secp256Point<ark_secp256k1::Config>> for Secp256k1Point {
     fn from(p: Secp256Point<ark_secp256k1::Config>) -> Self {
