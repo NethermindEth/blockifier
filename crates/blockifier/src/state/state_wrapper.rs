@@ -15,7 +15,19 @@ use crate::state::state_api::{State, StateReader, StateResult};
 mod test;
 
 /// DynStateWrapper is a wrapper that works as a TransactionState, but using only the dyn State
-/// trait. So it can be used for fallback mechanism.
+/// trait.
+///
+/// The reason of creating this wrapper is to allow the usage of the anything that implements the
+/// State trait, as Transactional, it was created to be used in the fallback mechanism of the in the
+/// following way:
+/// - We have state A, that is a `&mut dyn State`
+/// - We create wrapped state B, that is a `DynStateWrapper<'_>`, that wraps the state A
+/// - We call the fallback mechanism with the wrapped state B
+/// - The fallback mechanism will call the `commit` method of the wrapped state B if everything is
+///   ok
+/// - If execution fails, the wrapped state B will be dropped, and the state A will be untouched
+///
+/// This way, we can use the fallback mechanism with any state that implements the State trait.
 pub struct DynStateWrapper<'a> {
     pub state: &'a mut dyn State,
 
