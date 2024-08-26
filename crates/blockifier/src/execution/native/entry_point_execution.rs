@@ -8,6 +8,7 @@ use crate::execution::entry_point::{
     CallEntryPoint, EntryPointExecutionContext, EntryPointExecutionResult,
 };
 use crate::state::state_api::State;
+use log::debug;
 
 pub fn execute_entry_point_call(
     call: CallEntryPoint,
@@ -28,8 +29,8 @@ pub fn execute_entry_point_call(
         context,
     );
 
-    println!("Blockifier-Native: running the Native Executor");
+    debug!("Blockifier-Native: running the Native Executor");
     let result = run_native_executor(&contract_class.executor, function_id, call, syscall_handler);
-    println!("Blockifier-Native: Native Executor finished running");
+    debug!("Blockifier-Native: Native Executor finished running");
     result
 }
