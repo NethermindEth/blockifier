@@ -226,7 +226,7 @@ impl NativeContractClassV1 {
             sierra_program: &cairo_lang_sierra::program::Program,
         ) -> Result<AotNativeExecutor, cairo_native::error::Error> {
             let native_context = cairo_native::context::NativeContext::new();
-            let native_program = native_context.compile(sierra_program, None)?;
+            let native_program = native_context.compile(sierra_program)?;
             Ok(AotNativeExecutor::from_native_module(
                 native_program,
                 cairo_native::OptLevel::Default,

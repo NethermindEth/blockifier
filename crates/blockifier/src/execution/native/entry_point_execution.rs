@@ -1,4 +1,5 @@
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
+use log::debug;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::run_native_executor;
@@ -28,8 +29,8 @@ pub fn execute_entry_point_call(
         context,
     );
 
-    println!("Blockifier-Native: running the Native Executor");
+    debug!("Blockifier-Native: running the Native Executor");
     let result = run_native_executor(&contract_class.executor, function_id, call, syscall_handler);
-    println!("Blockifier-Native: Native Executor finished running");
+    debug!("Blockifier-Native: Native Executor finished running");
     result
 }
