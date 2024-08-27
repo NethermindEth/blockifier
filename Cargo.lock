@@ -1087,15 +1087,13 @@ dependencies = [
 [[package]]
 name = "cairo-native"
 version = "0.2.0"
-source = "git+https://github.com/lambdaclass/cairo_native?rev=0b77a8b#0b77a8b9b4d1690768b7ea890632da6a45603e84"
+source = "git+https://github.com/NethermindEth/cairo_native?branch=remove-unused-deps#b230f3a7ed367be1fc1e9265ed0b986b08bd03b0"
 dependencies = [
  "anyhow",
  "bumpalo",
  "cairo-lang-compiler",
  "cairo-lang-defs",
- "cairo-lang-diagnostics",
  "cairo-lang-filesystem",
- "cairo-lang-lowering",
  "cairo-lang-runner",
  "cairo-lang-semantic",
  "cairo-lang-sierra",
@@ -1111,7 +1109,6 @@ dependencies = [
  "clap 4.5.11",
  "colored",
  "educe",
- "id-arena",
  "itertools 0.13.0",
  "k256",
  "keccak",
@@ -1137,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "cairo-native-runtime"
 version = "0.2.0"
-source = "git+https://github.com/lambdaclass/cairo_native?rev=0b77a8b#0b77a8b9b4d1690768b7ea890632da6a45603e84"
+source = "git+https://github.com/NethermindEth/cairo_native?branch=remove-unused-deps#b230f3a7ed367be1fc1e9265ed0b986b08bd03b0"
 dependencies = [
  "cairo-lang-sierra-gas",
  "lazy_static",
