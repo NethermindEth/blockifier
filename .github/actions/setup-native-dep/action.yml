@@ -24,7 +24,7 @@ runs:
       uses: actions/checkout@v3
       with:
         repository: "lambdaclass/cairo_native"
-        ref: "cairo-lang2.7.0-rc.3"
+        ref: "0b77a8b"
         path: "cairo_native"
     - name: Install Cairo Native Runtime Dependencies
       id: set-env-vars
