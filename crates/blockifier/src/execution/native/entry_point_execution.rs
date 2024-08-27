@@ -1,4 +1,5 @@
 use cairo_vm::vm::runners::cairo_runner::ExecutionResources;
+use log::debug;
 
 use super::syscall_handler::NativeSyscallHandler;
 use super::utils::run_native_executor;
@@ -8,7 +9,6 @@ use crate::execution::entry_point::{
     CallEntryPoint, EntryPointExecutionContext, EntryPointExecutionResult,
 };
 use crate::state::state_api::State;
-use log::debug;
 
 pub fn execute_entry_point_call(
     call: CallEntryPoint,
